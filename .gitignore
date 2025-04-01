@@ -362,3 +362,5 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /MySurvey.Server/MySurvey.db
+/MySurvey.Server/MySurvey.db-shm
+/MySurvey.Server/MySurvey.db-wal
