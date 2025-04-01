@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	  <NoWarn>GEN053</NoWarn>
+	<NetCoreVer>9.0.3</NetCoreVer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Biwen.AutoClassGen" Version="1.5.6" PrivateAssets="all" />
+    <PackageReference Include="Biwen.AutoClassGen.Attributes" Version="1.3.6" />
+    <PackageReference Include="Biwen.QuickApi" Version="2.0.3" />
+    <PackageReference Include="Biwen.Settings" Version="2.6.0" />
+    <PackageReference Include="EPPlus" Version="7.7.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(NetCoreVer)" />
+	<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(NetCoreVer)" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(NetCoreVer)" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="$(NetCoreVer)">
+		<PrivateAssets>all</PrivateAssets>
+		<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+	</PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Models\" />
+  </ItemGroup>
+
+</Project>
