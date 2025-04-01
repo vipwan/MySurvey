@@ -667,4 +667,31 @@ public class SurveyService(
         var surveys = await query.OrderByDescending(s => s.CreatedAt).Take(10).ToListAsync(cancellationToken);
         return surveys;
     }
+
+    public async Task<(int SurveyCount, int SurveyCompleteCount, int AnswerCount, int UserCount)> StatAsync(string userId)
+    {
+        var surveyCount = await _context.Surveys.CountAsync(s => s.UserId == userId);
+        var surveyCompleteCount = await _context.Surveys.CountAsync(s => s.UserId == userId && s.Status == SurveyStatus.Ended);
+
+        //查询当前用户问卷的所有答案数量:
+        var answerCount = await _context.SurveyAnswers
+            .Where(a => _context.Surveys
+                .Where(s => s.UserId == userId)
+                .Select(s => s.Id)
+                .Contains(a.SurveyId))
+            .CountAsync();
+
+        // Count distinct users who have submitted answers to the user's surveys
+        var userCount = await _context.SurveyAnswers
+            .Where(a => _context.Surveys
+                .Where(s => s.UserId == userId)
+                .Select(s => s.Id)
+                .Contains(a.SurveyId))
+            .Select(a => a.UserId)
+            .Distinct()
+            .CountAsync();
+
+        return (surveyCount, surveyCompleteCount, answerCount, userCount);
+        
+    }
 }

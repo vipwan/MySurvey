@@ -134,6 +134,9 @@ export const surveyApi = {
     exportAnswers: (surveyId) => api.get(`/api/surveys/${surveyId}/export`, {
         responseType: 'blob'
     }),
+
+    // 统计数据
+    stat: () => api.get(`/api/dashboard-data`),
 };
 
 // 站点设置API

@@ -42,17 +42,9 @@ const Dashboard = () => {
 
     // 获取问卷统计数据
     const { data: surveyData, loading: surveyLoading } = useRequest(
-        async () => {
-            // 这里可以替换为真实的API调用
-            // 例如: return await surveyApi.getSurveyStats();
-
-            // 模拟数据
-            return {
-                totalSurveys: 24,
-                completedSurveys: 18,
-                totalResponses: 256,
-                activeUsers: 156
-            };
+        async () => {  
+            const response = await surveyApi.stat();
+            return response.data;  
         },
         {
             refreshDeps: [],
@@ -130,7 +122,7 @@ const Dashboard = () => {
                     <Card>
                         <Statistic
                             title="总问卷数"
-                            value={surveyData?.totalSurveys || 0}
+                            value={surveyData?.surveyCount || 0}
                             prefix={<FileTextOutlined />}
                         />
                     </Card>
@@ -139,7 +131,7 @@ const Dashboard = () => {
                     <Card>
                         <Statistic
                             title="已完成问卷"
-                            value={surveyData?.completedSurveys || 0}
+                            value={surveyData?.surveyCompleteCount || 0}
                             prefix={<FormOutlined />}
                         />
                     </Card>
@@ -148,7 +140,7 @@ const Dashboard = () => {
                     <Card>
                         <Statistic
                             title="总回答数"
-                            value={surveyData?.totalResponses || 0}
+                            value={surveyData?.answerCount || 0}
                             prefix={<FileTextOutlined />}
                         />
                     </Card>
@@ -157,7 +149,7 @@ const Dashboard = () => {
                     <Card>
                         <Statistic
                             title="活跃用户"
-                            value={surveyData?.activeUsers || 0}
+                            value={surveyData?.userCount || 0}
                             prefix={<UserOutlined />}
                         />
                     </Card>
@@ -165,7 +157,7 @@ const Dashboard = () => {
             </Row>
 
             <Card title="24小时在线用户统计" style={{ marginTop: 16 }}>
-                <div style={{ height: 400 }}>
+                <div style={{ height: 200 }}>
                     <Line {...lineConfig} />
                 </div>
             </Card>

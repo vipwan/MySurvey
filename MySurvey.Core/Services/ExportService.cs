@@ -49,6 +49,7 @@ public class ExportService(ApplicationDbContext context) : IExportService
                     .ThenInclude(ma => ma.Column)
             .Where(a => a.SurveyId == surveyId)
             .OrderByDescending(a => a.SubmitTime)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         // 创建选项映射字典，提高性能

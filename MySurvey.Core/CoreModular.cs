@@ -7,6 +7,7 @@ using Biwen.QuickApi.OpenApi;
 using Biwen.QuickApi.OpenApi.Scalar;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Identity;
@@ -18,7 +19,7 @@ using MySurvey.Core.Data;
 using MySurvey.Core.Infrastructure.Interceptors;
 
 namespace MySurvey.Core;
-public class CoreModular(IConfiguration configuration) : ModularBase
+public class CoreModular(IConfiguration configuration,IWebHostEnvironment env) : ModularBase
 {
     public override void ConfigureServices(IServiceCollection services)
     {
@@ -54,12 +55,10 @@ public class CoreModular(IConfiguration configuration) : ModularBase
         //    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         //});
 
-
         // 注册XSS清理拦截器
         services.AddScoped<XssSanitizationInterceptor>();
 
         //dbcontext
-        // 配置数据库
         services.AddDbContext<ApplicationDbContext>((sp, builder) =>
         {
             // Xss清理拦截器
@@ -68,6 +67,12 @@ public class CoreModular(IConfiguration configuration) : ModularBase
             builder.AddInterceptors(interceptor);
             // 配置SQLite
             builder.UseSqlite(configuration.GetConnectionString("DefaultConnection"));
+        });
+
+        services.ConfigureApplicationCookie(o =>
+        {
+            o.ExpireTimeSpan = TimeSpan.FromDays(1);//票据一天过期
+            o.SlidingExpiration = true;//使用滑动过期
         });
 
         //identity 
@@ -79,7 +84,6 @@ public class CoreModular(IConfiguration configuration) : ModularBase
             o.Password.RequireLowercase = false;
             o.Password.RequireDigit = false;
             o.Password.RequireUppercase = false;
-
         }).AddEntityFrameworkStores<ApplicationDbContext>();
 
         //all
@@ -104,7 +108,7 @@ public class CoreModular(IConfiguration configuration) : ModularBase
         routes.MapRazorPages();
 
         // debug api & logging
-        if (((WebApplication)app).Environment.IsDevelopment())
+        if (env.IsDevelopment())
         {
             //Http Logging
             app.UseHttpLogging();

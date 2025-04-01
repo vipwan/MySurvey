@@ -1,6 +1,18 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, message, Drawer, Popconfirm, Typography, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
+﻿/*
+ * @Author: 万雅虎
+ * @Date: 2025-03-29 20:47:21
+ * @LastEditTime: 2025-04-01 23:38:14
+ * @LastEditors: 万雅虎
+ * @Description: 
+ * @FilePath: \MySurvey\mysurvey.client\src\components\survey\QuestionList.jsx
+ * vipwan@sina.com © 万雅虎
+ */
+import React, { useState, useEffect } from 'react';
+import { Button, Space, message, Drawer, Popconfirm, Typography, Tooltip, Form, InputNumber, Card } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, OrderedListOutlined } from '@ant-design/icons';
+
+import { ProTable } from '@ant-design/pro-components'
+
 import { useParams } from 'react-router-dom';
 import { surveyApi } from '../../services/api';
 import QuestionEdit from './QuestionEdit';
@@ -22,9 +34,12 @@ const QuestionList = () => {
     const [questions, setQuestions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [drawerVisible, setDrawerVisible] = useState(false);
+    const [sortDrawerVisible, setSortDrawerVisible] = useState(false);
     const [editingQuestion, setEditingQuestion] = useState(null);
     const [isCreating, setIsCreating] = useState(false);
     const [survey, setSurvey] = useState(null);
+    const [sortLoading, setSortLoading] = useState(false);
+    const [form] = Form.useForm();
 
     // 获取问卷信息和问题列表
     const fetchData = async () => {
@@ -56,6 +71,7 @@ const QuestionList = () => {
             console.error('surveyId is undefined in useEffect');
             message.error('问卷ID获取失败');
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [surveyId]);
 
     // 添加新问题
@@ -269,14 +285,64 @@ const QuestionList = () => {
         }
     };
 
+    // 打开排序抽屉
+    const handleOpenSortDrawer = () => {
+        // 初始化表单数据
+        const initialValues = {};
+        questions.forEach(question => {
+            initialValues[`order_${question.id}`] = question.order;
+        });
+        form.setFieldsValue(initialValues);
+        setSortDrawerVisible(true);
+    };
+
+    // 保存排序
+    const handleSaveSort = async () => {
+        try {
+            const values = await form.validateFields();
+            setSortLoading(true);
+
+            // 创建更新请求
+            const updatePromises = questions.map(question => {
+                const newOrder = values[`order_${question.id}`];
+                const requestData = {
+                    title: question.title,
+                    description: question.description || '',
+                    type: question.type,
+                    isRequired: question.isRequired,
+                    order: newOrder, // 使用表单中的排序值
+                    options: question.options || [],
+                    validationRuleType: question.validationRuleType,
+                    customValidationPattern: question.customValidationPattern,
+                    validationErrorMessage: question.validationErrorMessage
+                };
+                
+                return surveyApi.updateQuestion(surveyId, question.id, requestData);
+            });
+
+            // 并行处理所有更新请求
+            await Promise.all(updatePromises);
+            message.success('问题顺序更新成功');
+            
+            // 关闭抽屉并刷新数据
+            setSortDrawerVisible(false);
+            fetchData();
+        } catch (error) {
+            console.error('更新问题顺序失败:', error);
+            message.error('更新问题顺序失败');
+        } finally {
+            setSortLoading(false);
+        }
+    };
+
     // 表格列定义
     const columns = [
         {
             title: '序号',
             dataIndex: 'order',
             key: 'order',
-            width: 80,
-            sorter: (a, b) => a.order - b.order,
+            width: 60,
+            render: (_, __, index) => index + 1,
         },
         {
             title: '问题类型',
@@ -303,7 +369,7 @@ const QuestionList = () => {
                 showTitle: false,
             },
             render: (title) => (
-                <Tooltip placement="topLeft" title={title}>
+                <Tooltip color={'blue'} title={title}>
                     {title}
                 </Tooltip>
             ),
@@ -370,23 +436,39 @@ const QuestionList = () => {
                 <Title level={4}>
                     {survey ? `问题管理: ${survey.title}` : '问题管理'}
                 </Title>
-                <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={handleAddQuestion}
-                >
-                    添加问题
-                </Button>
+                <Space>
+                    <Button
+                        icon={<OrderedListOutlined />}
+                        onClick={handleOpenSortDrawer}
+                    >
+                        调整顺序
+                    </Button>
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={handleAddQuestion}
+                    >
+                        添加问题
+                    </Button>
+                </Space>
             </div>
-
-            <Table
+    
+            <ProTable
                 columns={columns}
                 dataSource={questions}
                 rowKey="id"
                 loading={loading}
                 pagination={false}
+                search={false}
+                options={{
+                    reload: fetchData,
+                    density: true,
+                    setting: true,
+                }}
+                tableAlertRender={false}
             />
-
+    
+            {/* 问题编辑抽屉 */}
             <Drawer
                 title={isCreating ? "添加问题" : "编辑问题"}
                 placement="right"
@@ -402,6 +484,49 @@ const QuestionList = () => {
                         onCancel={() => setDrawerVisible(false)}
                     />
                 )}
+            </Drawer>
+
+            {/* 问题排序抽屉 */}
+            <Drawer
+                title="调整问题顺序"
+                placement="right"
+                width={400}
+                onClose={() => setSortDrawerVisible(false)}
+                open={sortDrawerVisible}
+                destroyOnClose
+                extra={
+                    <Space>
+                        <Button onClick={() => setSortDrawerVisible(false)}>取消</Button>
+                        <Button type="primary" loading={sortLoading} onClick={handleSaveSort}>
+                            保存
+                        </Button>
+                    </Space>
+                }
+            >
+                <Form
+                    form={form}
+                    layout="vertical"
+                >
+                    <div style={{ marginBottom: 16 }}>
+                        请为每个问题设置一个顺序号，值越小排列越靠前。
+                    </div>
+                    {questions.map((question, index) => (
+                        <Card
+                            key={question.id}
+                            size="small"
+                            title={`${index + 1}. ${question.title}`}
+                            style={{ marginBottom: 12 }}
+                        >
+                            <Form.Item
+                                name={`order_${question.id}`}
+                                label="顺序"
+                                rules={[{ required: true, message: '请输入顺序' }]}
+                            >
+                                <InputNumber min={0} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Card>
+                    ))}
+                </Form>
             </Drawer>
         </div>
     );

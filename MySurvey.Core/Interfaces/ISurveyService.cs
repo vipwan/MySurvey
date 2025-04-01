@@ -144,4 +144,13 @@ public interface ISurveyService
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     Task<IEnumerable<Survey>> GetSurveysAsync(string? userId, DateTime? st, DateTime? et, SurveyStatus status = SurveyStatus.Published, CancellationToken cancellationToken = default);
+
+
+    /// <summary>
+    /// 统计
+    /// </summary>
+    /// <param name="userId"></param>
+    /// <returns></returns>
+    Task<(int SurveyCount, int SurveyCompleteCount, int AnswerCount, int UserCount)> StatAsync(string userId);
+
 }

@@ -104,6 +104,12 @@ public static class SurveyApis
                 return Results.Unauthorized();
             }
 
+            var valide = request.Validate();
+            if (!valide.IsValid)
+            {
+                return Results.BadRequest(valide.Errors);
+            }
+
             var survey = new Survey
             {
                 Id = Guid.NewGuid(),
@@ -144,6 +150,12 @@ public static class SurveyApis
             if (existingSurvey.UserId != userId)
             {
                 return Results.Forbid();
+            }
+
+            var valid = request.Validate();
+            if (!valid.IsValid)
+            {
+                return Results.BadRequest(valid.Errors);
             }
 
             existingSurvey.Title = request.Title;
@@ -325,6 +337,13 @@ public static class SurveyApis
             if (question == null || question.SurveyId != surveyId)
             {
                 return Results.NotFound();
+            }
+
+            // 验证请求
+            var valid = request.Validate();
+            if (!valid.IsValid)
+            {
+                return Results.BadRequest(valid.Errors);
             }
 
             // 使用Mapster转换选项
