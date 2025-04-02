@@ -47,7 +47,7 @@ public static class SurveyApis
                 return Results.Unauthorized();
             }
 
-            var (surveys, totalCount) = await surveyService.GetUserSurveysAsync(
+            var pagelist = await surveyService.GetUserSurveysAsync(
                 userId,
                 pageNumber,
                 pageSize,
@@ -59,16 +59,16 @@ public static class SurveyApis
                 cancellationToken);
 
             // 使用Mapster转换为ViewModel
-            var result = mapper.Map<IEnumerable<SurveyViewModel>>(surveys);
+            var result = mapper.Map<IEnumerable<SurveyViewModel>>(pagelist.Items);
 
             // 返回带有分页信息的响应
             return Results.Ok(new
             {
                 data = result,
                 pageNumber,
-                pageSize,
-                totalCount,
-                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+                pagelist.PageSize,
+                pagelist.TotalCount,
+                totalPages = pagelist.TotalPages
             });
         });
 

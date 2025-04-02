@@ -42,9 +42,9 @@ MySurvey是基于[Biwen.QuickApi](https://github.com/vipwan/Biwen.QuickApi)的�
 ### 前端
 - React 18
 - Ant Design 5.x
+- ahooks 3
 - React Router 6
 - Axios
-- QRCode.react
 
 ## 项目结构
 

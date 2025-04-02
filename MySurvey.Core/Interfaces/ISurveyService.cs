@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 // PersonalFinance.Core ISurveyService.cs 
 
+using Biwen.QuickApi.UnitOfWork.Pagenation;
 using MySurvey.Core.Entities;
 
 namespace MySurvey.Core.Interfaces;
@@ -45,7 +46,7 @@ public interface ISurveyService
     /// <param name="endDateTo">结束时间上限</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>分页的问卷列表和总记录数</returns>
-    Task<(IEnumerable<Survey> Surveys, int TotalCount)> GetUserSurveysAsync(
+    Task<IPagedList<Survey>> GetUserSurveysAsync(
         string userId,
         int pageNumber = 1,
         int pageSize = 10,

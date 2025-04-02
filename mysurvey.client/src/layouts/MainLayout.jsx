@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { Typography, Dropdown, message, Switch } from 'antd';
+import { Dropdown, message, Switch } from 'antd';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     HomeOutlined,
@@ -33,7 +33,7 @@ const MainLayout = ({ children }) => {
             customerServicePhone: ''
         },
         loading: true,
-        layoutMode:'top'
+        layoutMode: 'top'
     });
 
     // 加载用户信息
@@ -115,6 +115,12 @@ const MainLayout = ({ children }) => {
             icon: <GithubOutlined />,
             key: '4',
         },
+        ...(process.env.NODE_ENV === 'development' ? [{
+            path: 'http://localhost:5289/openapi/scalar/v1',
+            name: 'API接口',
+            icon: <GatewayOutlined />,
+            key: '5',
+        }] : []),
     ];
 
     // 用户头像下拉菜单
@@ -190,7 +196,7 @@ const MainLayout = ({ children }) => {
                                         items: avatarDropdownItems
                                     }}
                                     placement="bottomRight">
-                                    
+
                                     {dom}
                                 </Dropdown>
                                 <SettingOutlined />

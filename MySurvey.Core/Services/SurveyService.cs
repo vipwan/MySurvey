@@ -4,6 +4,8 @@
 // PersonalFinance.Core SurveyService.cs 
 // 2025-03-24 16:23:19  PersonalFinance.Core vipwa 
 
+using Biwen.QuickApi.UnitOfWork;
+using Biwen.QuickApi.UnitOfWork.Pagenation;
 using Microsoft.EntityFrameworkCore;
 using MySurvey.Core.Data;
 using MySurvey.Core.Entities;
@@ -119,7 +121,7 @@ public class SurveyService(
     /// <param name="endDateTo">结束时间上限</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>分页的问卷列表和总记录数</returns>
-    public async Task<(IEnumerable<Survey> Surveys, int TotalCount)> GetUserSurveysAsync(
+    public async Task<IPagedList<Survey>> GetUserSurveysAsync(
         string userId,
         int pageNumber = 1,
         int pageSize = 10,
@@ -168,19 +170,22 @@ public class SurveyService(
             query = query.Where(s => s.EndTime <= endDateTo.Value);
         }
 
-        // 获取总记录数
-        var totalCount = await query.CountAsync(cancellationToken);
+        //// 获取总记录数
+        //var totalCount = await query.CountAsync(cancellationToken);
 
-        // 应用排序和分页
-        var surveys = await query
-            .OrderByDescending(s => s.CreatedAt)
-            .ThenByDescending(s => s.Status)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .AsSplitQuery() // 优化性能，拆分查询
-            .ToListAsync(cancellationToken);
+        //// 应用排序和分页
+        //var surveys = await query
+        //    .OrderByDescending(s => s.CreatedAt)
+        //    .ThenByDescending(s => s.Status)
+        //    .Skip((pageNumber - 1) * pageSize)
+        //    .Take(pageSize)
+        //    .AsSplitQuery() // 优化性能，拆分查询
+        //    .ToListAsync(cancellationToken);
 
-        return (surveys, totalCount);
+        //排序和拆分查询
+        query = query.OrderByDescending(s => s.CreatedAt).ThenByDescending(s => s.Status).AsSplitQuery();
+
+        return await query.ToPagedListAsync(pageNumber - 1, pageSize, cancellationToken: cancellationToken);
     }
 
 

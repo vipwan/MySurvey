@@ -1,5 +1,5 @@
 ﻿import React, { useRef } from 'react';
-import { Button, Space, Tag, Modal, message, Typography, Tooltip, Input, Dropdown, Tabs, Divider, App, theme, DatePicker } from 'antd';
+import { QRCode,Button, Space, Tag, Modal, message, Typography, Tooltip, Input, Dropdown, Tabs, Divider, App, theme, DatePicker } from 'antd';
 import {
     PlusOutlined,
     EditOutlined,
@@ -20,7 +20,6 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { surveyApi } from '../../services/api';
-import { QRCodeSVG } from 'qrcode.react';
 import { useReactive } from 'ahooks';
 import { ProTable } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
@@ -609,16 +608,9 @@ const SurveyList = () => {
                                         borderRadius: '8px',
                                         display: 'inline-block'
                                     }}>
-                                        <QRCodeSVG
+                                        <QRCode
                                             value={state.shareLink}
                                             size={200}
-                                            level="H"
-                                            includeMargin={true}
-                                            imageSettings={{
-                                                x: undefined,
-                                                y: undefined,
-                                                excavate: false
-                                            }}
                                         />
                                     </div>
                                     <p>
