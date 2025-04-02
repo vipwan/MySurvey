@@ -29,9 +29,13 @@ public static class SurveyApis
 
         // 获取问卷列表（需要身份验证）
         group.MapGet("/surveys", [Authorize] async (
-            [FromQuery] DateTime? startDate,
-            [FromQuery] DateTime? endDate,
-            [FromQuery] SurveyStatus status,
+            [FromQuery] int pageNumber,
+            [FromQuery] int pageSize,
+            [FromQuery] SurveyStatus? status,
+            [FromQuery] DateTime? startDateFrom,
+            [FromQuery] DateTime? startDateTo,
+            [FromQuery] DateTime? endDateFrom,
+            [FromQuery] DateTime? endDateTo,
             IHttpContextAccessor httpContext,
             ISurveyService surveyService,
             IMapper mapper,
@@ -43,13 +47,31 @@ public static class SurveyApis
                 return Results.Unauthorized();
             }
 
-            var surveys = await surveyService.GetUserSurveysAsync(userId, cancellationToken);
+            var (surveys, totalCount) = await surveyService.GetUserSurveysAsync(
+                userId,
+                pageNumber,
+                pageSize,
+                status,
+                startDateFrom,
+                startDateTo,
+                endDateFrom,
+                endDateTo,
+                cancellationToken);
 
             // 使用Mapster转换为ViewModel
             var result = mapper.Map<IEnumerable<SurveyViewModel>>(surveys);
 
-            return Results.Ok(result);
+            // 返回带有分页信息的响应
+            return Results.Ok(new
+            {
+                data = result,
+                pageNumber,
+                pageSize,
+                totalCount,
+                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            });
         });
+
 
         // 获取公开问卷列表（允许匿名访问）
         group.MapGet("/public-surveys", async (

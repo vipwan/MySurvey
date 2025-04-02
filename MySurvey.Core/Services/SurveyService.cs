@@ -107,18 +107,82 @@ public class SurveyService(
     }
 
     /// <summary>
-    /// 获取用户的问卷列表
+    /// 获取用户的问卷列表，支持分页、状态和时间范围筛选
     /// </summary>
-    public async Task<IEnumerable<Survey>> GetUserSurveysAsync(string userId, CancellationToken cancellationToken = default)
+    /// <param name="userId">用户ID</param>
+    /// <param name="pageNumber">页码，从1开始</param>
+    /// <param name="pageSize">每页大小</param>
+    /// <param name="status">问卷状态，null表示查询所有状态</param>
+    /// <param name="startDateFrom">开始时间下限</param>
+    /// <param name="startDateTo">开始时间上限</param>
+    /// <param name="endDateFrom">结束时间下限</param>
+    /// <param name="endDateTo">结束时间上限</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>分页的问卷列表和总记录数</returns>
+    public async Task<(IEnumerable<Survey> Surveys, int TotalCount)> GetUserSurveysAsync(
+        string userId,
+        int pageNumber = 1,
+        int pageSize = 10,
+        SurveyStatus? status = null,
+        DateTime? startDateFrom = null,
+        DateTime? startDateTo = null,
+        DateTime? endDateFrom = null,
+        DateTime? endDateTo = null,
+        CancellationToken cancellationToken = default)
     {
-        return await _context.Surveys
+        // 验证分页参数
+        if (pageNumber < 1) pageNumber = 1;
+        if (pageSize < 1) pageSize = 10;
+        if (pageSize > 100) pageSize = 100; // 限制最大页大小
+
+        // 构建基础查询
+        var query = _context.Surveys
             .Include(s => s.Questions)
             .Include(s => s.Answers)
-            .Where(s => s.UserId == userId)
-            .OrderByDescending(s => s.CreatedAt).ThenByDescending(s => s.Status)
-            .AsSplitQuery()
+            .Where(s => s.UserId == userId);
+
+        // 应用状态筛选
+        if (status.HasValue)
+        {
+            query = query.Where(s => s.Status == status.Value);
+        }
+
+        // 应用时间范围筛选
+        if (startDateFrom.HasValue)
+        {
+            query = query.Where(s => s.StartTime >= startDateFrom.Value);
+        }
+
+        if (startDateTo.HasValue)
+        {
+            query = query.Where(s => s.StartTime <= startDateTo.Value);
+        }
+
+        if (endDateFrom.HasValue)
+        {
+            query = query.Where(s => s.EndTime >= endDateFrom.Value);
+        }
+
+        if (endDateTo.HasValue)
+        {
+            query = query.Where(s => s.EndTime <= endDateTo.Value);
+        }
+
+        // 获取总记录数
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // 应用排序和分页
+        var surveys = await query
+            .OrderByDescending(s => s.CreatedAt)
+            .ThenByDescending(s => s.Status)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .AsSplitQuery() // 优化性能，拆分查询
             .ToListAsync(cancellationToken);
+
+        return (surveys, totalCount);
     }
+
 
     /// <summary>
     /// 发布问卷

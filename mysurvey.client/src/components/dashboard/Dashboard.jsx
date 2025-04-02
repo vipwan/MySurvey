@@ -139,7 +139,7 @@ const Dashboard = () => {
                 <Col span={6}>
                     <Card>
                         <Statistic
-                            title="总回答数"
+                            title="总提交的答卷数"
                             value={surveyData?.answerCount || 0}
                             prefix={<FileTextOutlined />}
                         />

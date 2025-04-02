@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useRef } from 'react';
-import { Table, Button, Space, Tag, Modal, message, Typography, Tooltip, Input, Dropdown, Tabs, Divider, App, theme } from 'antd';
+﻿import React, { useRef } from 'react';
+import { Button, Space, Tag, Modal, message, Typography, Tooltip, Input, Dropdown, Tabs, Divider, App, theme, DatePicker } from 'antd';
 import {
     PlusOutlined,
     EditOutlined,
@@ -15,14 +15,19 @@ import {
     LinkOutlined,
     QrcodeOutlined,
     DownloadOutlined,
+    SearchOutlined,
+    FilterOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { surveyApi } from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
-import { useReactive } from 'ahooks'
+import { useReactive } from 'ahooks';
+import { ProTable } from '@ant-design/pro-components';
+import dayjs from 'dayjs';
 
 const { Title } = Typography;
 const { useToken } = theme;
+const { RangePicker } = DatePicker;
 
 const SurveyList = () => {
     // 获取主题token，用于颜色统一
@@ -34,13 +39,6 @@ const SurveyList = () => {
 
     // 使用 useReactive 替代多个 useState
     const state = useReactive({
-        surveys: [],
-        loading: false,
-        pagination: {
-            current: 1,
-            pageSize: 10,
-            total: 0
-        },
         shareModalVisible: false,
         currentSurvey: null,
         shareLink: '',
@@ -58,28 +56,6 @@ const SurveyList = () => {
         transition: 'all 0.3s',
     };
 
-    const fetchSurveys = async () => {
-        try {
-            state.loading = true;
-            const response = await surveyApi.getSurveys({
-                status: 0, // 所有状态
-                pageSize: state.pagination.pageSize,
-                pageNumber: state.pagination.current,
-            });
-            // 修改这里，直接使用 response.data
-            state.surveys = response.data;
-            state.pagination.total = response.data.length;
-        } catch (error) {
-            message.error('获取问卷列表失败');
-        } finally {
-            state.loading = false;
-        }
-    };
-
-    useEffect(() => {
-        fetchSurveys();
-    }, [state.pagination.current, state.pagination.pageSize]);
-
     const handleDelete = async (id) => {
         // 使用 modal.confirm 替代 Modal.confirm
         modal.confirm({
@@ -90,7 +66,7 @@ const SurveyList = () => {
                 try {
                     await surveyApi.deleteSurvey(id);
                     message.success('删除成功');
-                    fetchSurveys();
+                    tableRef.current?.reload();
                 } catch (error) {
                     message.error('删除失败');
                 }
@@ -102,7 +78,7 @@ const SurveyList = () => {
         try {
             await surveyApi.copySurvey(id);
             message.success('复制成功');
-            fetchSurveys();
+            tableRef.current?.reload();
         } catch (error) {
             message.error('复制失败');
         }
@@ -113,17 +89,17 @@ const SurveyList = () => {
         try {
             if (newStatus === 0) { // 设置为草稿
                 // 先复制一份当前问卷
-                const result = await surveyApi.copySurvey(id);
+                await surveyApi.copySurvey(id);
                 message.success('问卷已复制为草稿状态');
-                fetchSurveys();
+                tableRef.current?.reload();
             } else if (newStatus === 1) { // 发布问卷
                 await surveyApi.publishSurvey(id);
                 message.success('问卷已发布');
-                fetchSurveys();
+                tableRef.current?.reload();
             } else if (newStatus === 2) { // 结束问卷
                 await surveyApi.endSurvey(id);
                 message.success('问卷已结束');
-                fetchSurveys();
+                tableRef.current?.reload();
             }
         } catch (error) {
             message.error(`状态变更失败: ${error.response?.data || error.message}`);
@@ -168,17 +144,32 @@ const SurveyList = () => {
         }
     };
 
+    // 定义状态选项
+    const statusOptions = [
+        { label: '全部状态', value: undefined },
+        { label: '草稿', value: 0 },
+        { label: '已发布', value: 1 },
+        { label: '已结束', value: 2 }
+    ];
+
+    // 表格列定义
     const columns = [
         {
             title: '标题',
             dataIndex: 'title',
             key: 'title',
-            width: 250,
-            ellipsis: {
-                showTitle: false,
+            ellipsis: true,
+            formItemProps: {
+                rules: [
+                    {
+                        required: true,
+                        message: '此项为必填项',
+                    },
+                ],
             },
+            width: 250,
             render: title => (
-                <Tooltip placement="topLeft" title={title}>
+                <Tooltip color={ '#fff' } placement="topLeft" title={title}>
                     <span>{title}</span>
                 </Tooltip>
             ),
@@ -187,7 +178,14 @@ const SurveyList = () => {
             title: '状态',
             dataIndex: 'status',
             key: 'status',
-            width: 80,
+            width: 100,
+            valueType: 'select',
+            valueEnum: {
+                0: { text: '草稿', status: 'Default' },
+                1: { text: '已发布', status: 'Success' },
+                2: { text: '已结束', status: 'Error' },
+            },
+            filters: false,
             render: (status) => {
                 const statusMap = {
                     0: { text: '草稿', color: 'default' },
@@ -195,28 +193,29 @@ const SurveyList = () => {
                     2: { text: '已结束', color: 'error' },
                 };
                 const { text, color } = statusMap[status] || { text: '未知', color: 'default' };
-                return <Tag color={color}>{text}</Tag>;
+                return <Tag color={color}>{status}</Tag>;
             },
         },
         {
             title: '开始时间',
             dataIndex: 'startTime',
             key: 'startTime',
-            width: 100,
-            render: (date) => new Date(date).toLocaleString(),
+            width: 120,
+            valueType: 'dateTime',
         },
         {
             title: '结束时间',
             dataIndex: 'endTime',
             key: 'endTime',
-            width: 100,
-            render: (date) => new Date(date).toLocaleString(),
+            width: 120,
+            valueType: 'dateTime',
         },
         {
             title: '操作',
             key: 'action',
             fixed: 'right',
             width: 340,
+            hideInSearch: true,
             render: (_, record) => {
                 const isPublished = record.status === 1;
                 const isDraft = record.status === 0;
@@ -413,67 +412,97 @@ const SurveyList = () => {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                <Tooltip title="创建新的问卷" placement="left">
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => navigate('/surveys/create')}
-                        style={{
-                            borderRadius: '6px',
-                            fontWeight: 500,
-                            boxShadow: '0 2px 0 rgba(0, 0, 0, 0.045)'
-                        }}
-                    >
-                        添加问卷
-                    </Button>
-                </Tooltip>
-            </div>
-
-            {state.surveys.length === 0 && !state.loading ? (
-                <div style={{
-                    textAlign: 'center',
-                    padding: '40px 0',
-                    background: '#fafafa',
-                    borderRadius: '8px',
-                    marginBottom: '16px',
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
-                }}>
-                    <p style={{ color: token.colorTextSecondary, marginBottom: '16px' }}>暂无问卷数据</p>
-                    <Tooltip title="开始创建您的第一个问卷" placement="top">
+            <ProTable
+                headerTitle="问卷列表"
+                columns={columns}
+                actionRef={tableRef}
+                rowKey="id"
+                search={{
+                    labelWidth: 'auto',
+                    defaultCollapsed: false,
+                    span: 6
+                }}
+                toolbar={{
+                    title: '问卷管理',
+                    actions: [
                         <Button
+                            key="add"
                             type="primary"
                             icon={<PlusOutlined />}
                             onClick={() => navigate('/surveys/create')}
                             style={{
                                 borderRadius: '6px',
-                                fontWeight: 500
+                                fontWeight: 500,
+                                boxShadow: '0 2px 0 rgba(0, 0, 0, 0.045)'
                             }}
                         >
-                            创建第一个问卷
+                            添加问卷
                         </Button>
-                    </Tooltip>
-                </div>
-            ) : (
-                <Table
-                    columns={columns}
-                    dataSource={state.surveys}
-                    rowKey="id"
-                    loading={state.loading}
-                    pagination={state.pagination}
-                    onChange={(pagination) => {
-                        state.pagination.current = pagination.current;
-                        state.pagination.pageSize = pagination.pageSize;
-                    }}
-                    scroll={{ x: 1100 }}
-                    style={{
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
-                    }}
-                    ref={tableRef}
-                />
-            )}
+                    ],
+                }}
+                scroll={{ x: 1200 }}
+                request={async (params, sort, filter) => {
+                    // 构建后端API需要的查询参数
+                    const { current, pageSize, title, status, startTime, endTime } = params;
+
+                    // 处理查询参数
+                    const queryParams = {
+                        pageNumber: current || 1,
+                        pageSize: pageSize || 10,
+                        status: status,
+                        startDateFrom: startTime?.[0] ? dayjs(startTime[0]).format('YYYY-MM-DD') : undefined,
+                        startDateTo: startTime?.[1] ? dayjs(startTime[1]).format('YYYY-MM-DD') : undefined,
+                        endDateFrom: endTime?.[0] ? dayjs(endTime[0]).format('YYYY-MM-DD') : undefined,
+                        endDateTo: endTime?.[1] ? dayjs(endTime[1]).format('YYYY-MM-DD') : undefined,
+                    };
+
+                    // 处理排序参数
+                    if (sort) {
+                        const sortField = Object.keys(sort)[0];
+                        const sortOrder = sort[sortField] === 'ascend' ? 'asc' : 'desc';
+                        queryParams.sortField = sortField;
+                        queryParams.sortOrder = sortOrder;
+                    }
+
+                    try {
+                        // 调用API
+                        const response = await surveyApi.getSurveys(queryParams);
+
+                        // 处理响应数据
+                        return {
+                            data: response.data.data,
+                            success: true,
+                            total: response.data.totalCount,
+                        };
+                    } catch (error) {
+                        message.error('获取问卷列表失败');
+                        return {
+                            data: [],
+                            success: false,
+                            total: 0,
+                        };
+                    }
+                }}
+                pagination={{
+                    showQuickJumper: true,
+                    showSizeChanger: true,
+                    pageSizeOptions: [10, 20, 50, 100],
+                    defaultPageSize: 10,
+                }}
+                dateFormatter="string"
+                options={{
+                    density: true,
+                    fullScreen: true,
+                    reload: true,
+                    setting: true,
+                }}
+                style={{
+                    background: '#fff',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+                }}
+            />
 
             {/* 分享问卷的弹窗 */}
             <Modal

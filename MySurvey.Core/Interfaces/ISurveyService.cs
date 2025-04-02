@@ -33,9 +33,29 @@ public interface ISurveyService
     Task<Survey?> GetSurveyAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 获取用户的问卷列表
+    /// 获取用户的问卷列表，支持分页、状态和时间范围筛选
     /// </summary>
-    Task<IEnumerable<Survey>> GetUserSurveysAsync(string userId, CancellationToken cancellationToken = default);
+    /// <param name="userId">用户ID</param>
+    /// <param name="pageNumber">页码，从1开始</param>
+    /// <param name="pageSize">每页大小</param>
+    /// <param name="status">问卷状态，null表示查询所有状态</param>
+    /// <param name="startDateFrom">开始时间下限</param>
+    /// <param name="startDateTo">开始时间上限</param>
+    /// <param name="endDateFrom">结束时间下限</param>
+    /// <param name="endDateTo">结束时间上限</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>分页的问卷列表和总记录数</returns>
+    Task<(IEnumerable<Survey> Surveys, int TotalCount)> GetUserSurveysAsync(
+        string userId,
+        int pageNumber = 1,
+        int pageSize = 10,
+        SurveyStatus? status = null,
+        DateTime? startDateFrom = null,
+        DateTime? startDateTo = null,
+        DateTime? endDateFrom = null,
+        DateTime? endDateTo = null,
+        CancellationToken cancellationToken = default);
+
 
     /// <summary>
     /// 发布问卷

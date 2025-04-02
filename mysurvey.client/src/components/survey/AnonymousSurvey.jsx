@@ -1,7 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { Card, Form, Button, message, Spin, Result, Skeleton, Input, Radio, Checkbox, Rate, Table, Space } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useRequest, useTitle } from 'ahooks';
+import { useRequest, useTitle, useLockFn } from 'ahooks';
 import { surveyApi } from '../../services/api';
 
 // 问题类型枚举（与后端QuestionType保持一致）
@@ -149,9 +149,8 @@ const AnonymousSurvey = () => {
 
     useTitle(survey?.title ?? '');
 
-
     // 使用 useRequest 处理表单提交
-    const { run: submitSurvey, loading: submitting } = useRequest(
+    const { run: submitSurveyRaw, loading: submitting } = useRequest(
         (values) => surveyApi.submitAnswer(id, values),
         {
             manual: true,
@@ -166,7 +165,11 @@ const AnonymousSurvey = () => {
         }
     );
 
-    const handleSubmit = (values) => {
+    // 使用 useLockFn 包装提交函数，防止并发提交
+    const submitSurvey = useLockFn(submitSurveyRaw);
+
+    // 表单提交处理函数
+    const formatFormValues = (values) => {
         // 将表单数据转换成API需要的格式
         const questionAnswers = [];
 
@@ -215,24 +218,32 @@ const AnonymousSurvey = () => {
             }
         });
 
-        const formattedValues = {
+        return {
             anonymousId: null, // 或者可以生成一个匿名ID
             questionAnswers: questionAnswers
         };
-
-        submitSurvey(formattedValues);
     };
+
+    // 使用 useLockFn 包装的表单提交函数
+    const handleSubmit = useLockFn(async (values) => {
+        try {
+            const formattedValues = formatFormValues(values);
+            await submitSurvey(formattedValues);
+        } catch (error) {
+            // 错误处理已在 useRequest 的 onError 中进行
+            console.error('表单提交过程中发生错误:', error);
+        }
+    });
 
     // 显示加载状态
     if (loading) {
         return (
             <>
-                <Skeleton/>
+                <Skeleton />
                 <div style={{ textAlign: 'center', padding: '50px' }}>
                     <Spin size="large" />
                 </div>
             </>
-
         );
     }
 
