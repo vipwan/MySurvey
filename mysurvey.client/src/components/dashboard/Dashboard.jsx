@@ -1,19 +1,20 @@
 ﻿// mysurvey.client/src/components/dashboard/Dashboard.jsx
-import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Spin } from 'antd';
+import React from 'react';
+import { Card, Row, Col, Statistic, Spin, Skeleton } from 'antd';
 import { UserOutlined, FileTextOutlined, FormOutlined } from '@ant-design/icons';
 import { Line } from '@ant-design/charts';
-import { useRequest } from 'ahooks';
+import { useRequest, useInterval, useReactive } from 'ahooks';
 import { surveyApi } from '../../services/api';
 
 const Dashboard = () => {
+
     // 生成模拟的24小时在线用户数据
     const generateHourlyData = () => {
         const data = [];
         for (let i = 0; i < 24; i++) {
             // 生成随机用户数，但保持一定的趋势性
             // 早晨和晚上的用户数较少，下午和晚上的用户数较多
-            let baseValue = 100;
+            let baseValue = 200;
             if (i >= 7 && i <= 11) {
                 // 早晨到中午逐渐增加
                 baseValue = 200 + (i - 7) * 50;
@@ -38,7 +39,7 @@ const Dashboard = () => {
         return data;
     };
 
-    const [hourlyData, setHourlyData] = useState(generateHourlyData());
+    const hourlyData = useReactive({ data: generateHourlyData() });
 
     // 获取问卷统计数据
     const { data: surveyData, loading: surveyLoading } = useRequest(
@@ -53,7 +54,7 @@ const Dashboard = () => {
 
     // 线图配置
     const lineConfig = {
-        data: hourlyData,
+        data: hourlyData.data,
         xField: 'hour',
         yField: 'value',
         seriesField: 'category',
@@ -97,21 +98,20 @@ const Dashboard = () => {
     };
 
     // 每隔一段时间更新数据，模拟实时更新
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setHourlyData(generateHourlyData());
-        }, 60000); // 每分钟更新一次
-
-        return () => clearInterval(timer);
-    }, []);
-
+    useInterval(() => {
+        hourlyData.data = generateHourlyData();
+    }, 5000);//5秒更新
+   
     if (surveyLoading) {
         return (
-            <div style={{ textAlign: 'center', padding: '50px' }}>
-                <Spin size="large">
-                    <div style={{ padding: '30px' }}>加载中...</div>
-                </Spin>
-            </div>
+            <>
+                <Skeleton />
+                <div style={{ textAlign: 'center', padding: '50px' }}>
+                    <Spin size="large">
+                        <div style={{ padding: '30px' }}>加载中...</div>
+                    </Spin>
+                </div>
+            </>
         );
     }
 

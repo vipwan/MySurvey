@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Card, Form, Button, message, Spin, Result, Input, Radio, Checkbox, Rate, Table, Space } from 'antd';
+﻿import React, { useState } from 'react';
+import { Card, Form, Button, message, Spin, Result, Skeleton, Input, Radio, Checkbox, Rate, Table, Space } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRequest, useTitle } from 'ahooks';
 import { surveyApi } from '../../services/api';
@@ -226,9 +226,13 @@ const AnonymousSurvey = () => {
     // 显示加载状态
     if (loading) {
         return (
-            <div style={{ textAlign: 'center', padding: '50px' }}>
-                <Spin size="large" />
-            </div>
+            <>
+                <Skeleton/>
+                <div style={{ textAlign: 'center', padding: '50px' }}>
+                    <Spin size="large" />
+                </div>
+            </>
+
         );
     }
 

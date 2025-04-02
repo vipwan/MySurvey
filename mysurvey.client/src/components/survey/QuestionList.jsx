@@ -7,10 +7,10 @@
  * @FilePath: \MySurvey\mysurvey.client\src\components\survey\QuestionList.jsx
  * vipwan@sina.com © 万雅虎
  */
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Button, Space, message, Drawer, Popconfirm, Typography, Tooltip, Form, InputNumber, Card } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, OrderedListOutlined } from '@ant-design/icons';
-
+import { useReactive,useMount } from 'ahooks';
 import { ProTable } from '@ant-design/pro-components'
 
 import { useParams } from 'react-router-dom';
@@ -31,15 +31,19 @@ const QuestionType = {
 
 const QuestionList = () => {
     const { id: surveyId } = useParams();
-    const [questions, setQuestions] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [drawerVisible, setDrawerVisible] = useState(false);
-    const [sortDrawerVisible, setSortDrawerVisible] = useState(false);
-    const [editingQuestion, setEditingQuestion] = useState(null);
-    const [isCreating, setIsCreating] = useState(false);
-    const [survey, setSurvey] = useState(null);
-    const [sortLoading, setSortLoading] = useState(false);
     const [form] = Form.useForm();
+
+    // 使用 useReactive 替代多个 useState
+    const state = useReactive({
+        questions: [],
+        loading: false,
+        drawerVisible: false,
+        sortDrawerVisible: false,
+        editingQuestion: null,
+        isCreating: false,
+        survey: null,
+        sortLoading: false
+    });
 
     // 获取问卷信息和问题列表
     const fetchData = async () => {
@@ -48,31 +52,29 @@ const QuestionList = () => {
             message.error('问卷ID获取失败');
             return;
         }
-        setLoading(true);
+        state.loading = true;
         try {
             console.log('Fetching survey with ID:', surveyId);
             const response = await surveyApi.getSurvey(surveyId);
             const surveyData = response.data;
-            setSurvey(surveyData);
-            setQuestions(surveyData.questions || []);
+            state.survey = surveyData;
+            state.questions = surveyData.questions || [];
         } catch (error) {
             console.error('获取问题列表失败:', error);
             message.error('获取问题列表失败');
         } finally {
-            setLoading(false);
+            state.loading = false;
         }
     };
 
-    useEffect(() => {
-        console.log('Current surveyId:', surveyId);
+    useMount(() => {
         if (surveyId) {
             fetchData();
         } else {
             console.error('surveyId is undefined in useEffect');
             message.error('问卷ID获取失败');
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [surveyId]);
+    });
 
     // 添加新问题
     const handleAddQuestion = () => {
@@ -82,16 +84,16 @@ const QuestionList = () => {
             message.error('问卷ID获取失败');
             return;
         }
-        setIsCreating(true);
-        setEditingQuestion({
+        state.isCreating = true;
+        state.editingQuestion = {
             title: '',
             description: '',
             type: QuestionType.TextInput,
             isRequired: true,
-            order: questions.length,
+            order: state.questions.length,
             options: []
-        });
-        setDrawerVisible(true);
+        };
+        state.drawerVisible = true;
     };
 
     // 编辑问题
@@ -104,9 +106,9 @@ const QuestionList = () => {
             message.error('问题ID不能为空');
             return;
         }
-        setIsCreating(false);
-        setEditingQuestion(question);
-        setDrawerVisible(true);
+        state.isCreating = false;
+        state.editingQuestion = question;
+        state.drawerVisible = true;
     };
 
     // 复制问题
@@ -115,7 +117,7 @@ const QuestionList = () => {
             const copiedQuestion = {
                 ...question,
                 title: `${question.title} (复制)`,
-                order: questions.length,
+                order: state.questions.length,
                 id: undefined
             };
 
@@ -262,23 +264,23 @@ const QuestionList = () => {
 
             console.log('Saving question data:', requestData);
 
-            if (isCreating) {
+            if (state.isCreating) {
                 await surveyApi.addQuestion(surveyId, requestData);
                 message.success('问题添加成功');
             } else {
-                if (!editingQuestion?.id) {
+                if (!state.editingQuestion?.id) {
                     message.error('问题ID不能为空');
                     return;
                 }
-                await surveyApi.updateQuestion(surveyId, editingQuestion.id, requestData);
+                await surveyApi.updateQuestion(surveyId, state.editingQuestion.id, requestData);
                 message.success('问题更新成功');
             }
 
-            setDrawerVisible(false);
+            state.drawerVisible = false;
             fetchData();
         } catch (error) {
             console.error('保存问题失败:', error);
-            message.error(isCreating ? '添加问题失败' : '更新问题失败');
+            message.error(state.isCreating ? '添加问题失败' : '更新问题失败');
             if (error.response?.data?.message) {
                 message.error(error.response.data.message);
             }
@@ -289,21 +291,21 @@ const QuestionList = () => {
     const handleOpenSortDrawer = () => {
         // 初始化表单数据
         const initialValues = {};
-        questions.forEach(question => {
+        state.questions.forEach(question => {
             initialValues[`order_${question.id}`] = question.order;
         });
         form.setFieldsValue(initialValues);
-        setSortDrawerVisible(true);
+        state.sortDrawerVisible = true;
     };
 
     // 保存排序
     const handleSaveSort = async () => {
         try {
             const values = await form.validateFields();
-            setSortLoading(true);
+            state.sortLoading = true;
 
             // 创建更新请求
-            const updatePromises = questions.map(question => {
+            const updatePromises = state.questions.map(question => {
                 const newOrder = values[`order_${question.id}`];
                 const requestData = {
                     title: question.title,
@@ -316,22 +318,22 @@ const QuestionList = () => {
                     customValidationPattern: question.customValidationPattern,
                     validationErrorMessage: question.validationErrorMessage
                 };
-                
+
                 return surveyApi.updateQuestion(surveyId, question.id, requestData);
             });
 
             // 并行处理所有更新请求
             await Promise.all(updatePromises);
             message.success('问题顺序更新成功');
-            
+
             // 关闭抽屉并刷新数据
-            setSortDrawerVisible(false);
+            state.sortDrawerVisible = false;
             fetchData();
         } catch (error) {
             console.error('更新问题顺序失败:', error);
             message.error('更新问题顺序失败');
         } finally {
-            setSortLoading(false);
+            state.sortLoading = false;
         }
     };
 
@@ -434,7 +436,7 @@ const QuestionList = () => {
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Title level={4}>
-                    {survey ? `问题管理: ${survey.title}` : '问题管理'}
+                    {state.survey ? `问题管理: ${state.survey.title}` : '问题管理'}
                 </Title>
                 <Space>
                     <Button
@@ -452,12 +454,12 @@ const QuestionList = () => {
                     </Button>
                 </Space>
             </div>
-    
+
             <ProTable
                 columns={columns}
-                dataSource={questions}
+                dataSource={state.questions}
                 rowKey="id"
-                loading={loading}
+                loading={state.loading}
                 pagination={false}
                 search={false}
                 options={{
@@ -467,21 +469,21 @@ const QuestionList = () => {
                 }}
                 tableAlertRender={false}
             />
-    
+
             {/* 问题编辑抽屉 */}
             <Drawer
-                title={isCreating ? "添加问题" : "编辑问题"}
+                title={state.isCreating ? "添加问题" : "编辑问题"}
                 placement="right"
                 width={600}
-                onClose={() => setDrawerVisible(false)}
-                open={drawerVisible}
+                onClose={() => state.drawerVisible = false}
+                open={state.drawerVisible}
                 destroyOnClose
             >
-                {drawerVisible && (
+                {state.drawerVisible && (
                     <QuestionEdit
-                        question={editingQuestion}
+                        question={state.editingQuestion}
                         onSave={handleSaveQuestion}
-                        onCancel={() => setDrawerVisible(false)}
+                        onCancel={() => state.drawerVisible = false}
                     />
                 )}
             </Drawer>
@@ -491,13 +493,13 @@ const QuestionList = () => {
                 title="调整问题顺序"
                 placement="right"
                 width={400}
-                onClose={() => setSortDrawerVisible(false)}
-                open={sortDrawerVisible}
+                onClose={() => state.sortDrawerVisible = false}
+                open={state.sortDrawerVisible}
                 destroyOnClose
                 extra={
                     <Space>
-                        <Button onClick={() => setSortDrawerVisible(false)}>取消</Button>
-                        <Button type="primary" loading={sortLoading} onClick={handleSaveSort}>
+                        <Button onClick={() => state.sortDrawerVisible = false}>取消</Button>
+                        <Button type="primary" loading={state.sortLoading} onClick={handleSaveSort}>
                             保存
                         </Button>
                     </Space>
@@ -510,7 +512,7 @@ const QuestionList = () => {
                     <div style={{ marginBottom: 16 }}>
                         请为每个问题设置一个顺序号，值越小排列越靠前。
                     </div>
-                    {questions.map((question, index) => (
+                    {state.questions.map((question, index) => (
                         <Card
                             key={question.id}
                             size="small"

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import { Table, Button, Space, Tag, Modal, message, Typography, Tooltip, Input, Dropdown, Tabs, Divider, App, theme } from 'antd';
 import {
     PlusOutlined,
@@ -19,6 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { surveyApi } from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
+import { useReactive } from 'ahooks'
 
 const { Title } = Typography;
 const { useToken } = theme;
@@ -31,16 +32,21 @@ const SurveyList = () => {
     const tableRef = useRef(null);
     const modalRef = useRef(null);
 
-    const [surveys, setSurveys] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [pagination, setPagination] = useState({
-        current: 1,
-        pageSize: 10,
+    // 使用 useReactive 替代多个 useState
+    const state = useReactive({
+        surveys: [],
+        loading: false,
+        pagination: {
+            current: 1,
+            pageSize: 10,
+            total: 0
+        },
+        shareModalVisible: false,
+        currentSurvey: null,
+        shareLink: '',
+        activeTab: 'link'
     });
-    const [shareModalVisible, setShareModalVisible] = useState(false);
-    const [currentSurvey, setCurrentSurvey] = useState(null);
-    const [shareLink, setShareLink] = useState('');
-    const [activeTab, setActiveTab] = useState('link');
+
     const navigate = useNavigate();
     const { modal } = App.useApp(); // 使用 App.useApp() 获取 modal 实例
 
@@ -52,82 +58,27 @@ const SurveyList = () => {
         transition: 'all 0.3s',
     };
 
-    const actionStyles = {
-        question: {
-            color: token.colorInfo,
-            '&:hover': {
-                color: token.colorInfoHover,
-                background: token.colorInfoBg,
-            }
-        },
-        preview: {
-            color: token.colorPrimary,
-            '&:hover': {
-                color: token.colorPrimaryHover,
-                background: token.colorPrimaryBg,
-            }
-        },
-        edit: {
-            color: token.colorWarning,
-            '&:hover': {
-                color: token.colorWarningHover,
-                background: token.colorWarningBg,
-            }
-        },
-        share: {
-            color: token.colorSuccess,
-            '&:hover': {
-                color: token.colorSuccessHover,
-                background: token.colorSuccessBg,
-            }
-        },
-        export: {
-            color: token.colorPrimary,
-            '&:hover': {
-                color: token.colorPrimaryHover,
-                background: token.colorPrimaryBg,
-            }
-        },
-        copy: {
-            color: token.colorInfo,
-            '&:hover': {
-                color: token.colorInfoHover,
-                background: token.colorInfoBg,
-            }
-        },
-        delete: {
-            color: token.colorError,
-            '&:hover': {
-                color: token.colorErrorHover,
-                background: token.colorErrorBg,
-            }
-        }
-    };
-
     const fetchSurveys = async () => {
         try {
-            setLoading(true);
+            state.loading = true;
             const response = await surveyApi.getSurveys({
                 status: 0, // 所有状态
-                pageSize: pagination.pageSize,
-                pageNumber: pagination.current,
+                pageSize: state.pagination.pageSize,
+                pageNumber: state.pagination.current,
             });
             // 修改这里，直接使用 response.data
-            setSurveys(response.data);
-            setPagination({
-                ...pagination,
-                total: response.data.length,
-            });
+            state.surveys = response.data;
+            state.pagination.total = response.data.length;
         } catch (error) {
             message.error('获取问卷列表失败');
         } finally {
-            setLoading(false);
+            state.loading = false;
         }
     };
 
     useEffect(() => {
         fetchSurveys();
-    }, [pagination.current, pagination.pageSize]);
+    }, [state.pagination.current, state.pagination.pageSize]);
 
     const handleDelete = async (id) => {
         // 使用 modal.confirm 替代 Modal.confirm
@@ -181,16 +132,16 @@ const SurveyList = () => {
 
     // 处理分享
     const handleShare = (record) => {
-        setCurrentSurvey(record);
+        state.currentSurvey = record;
         const link = `${window.location.origin}/anonymous-survey/${record.id}`;
-        setShareLink(link);
-        setShareModalVisible(true);
-        setActiveTab('link');
+        state.shareLink = link;
+        state.shareModalVisible = true;
+        state.activeTab = 'link';
     };
 
     // 复制分享链接
     const copyShareLink = () => {
-        navigator.clipboard.writeText(shareLink)
+        navigator.clipboard.writeText(state.shareLink)
             .then(() => {
                 message.success('链接已复制到剪贴板');
             })
@@ -479,7 +430,7 @@ const SurveyList = () => {
                 </Tooltip>
             </div>
 
-            {surveys.length === 0 && !loading ? (
+            {state.surveys.length === 0 && !state.loading ? (
                 <div style={{
                     textAlign: 'center',
                     padding: '40px 0',
@@ -506,11 +457,14 @@ const SurveyList = () => {
             ) : (
                 <Table
                     columns={columns}
-                    dataSource={surveys}
+                    dataSource={state.surveys}
                     rowKey="id"
-                    loading={loading}
-                    pagination={pagination}
-                    onChange={(pagination) => setPagination(pagination)}
+                    loading={state.loading}
+                    pagination={state.pagination}
+                    onChange={(pagination) => {
+                        state.pagination.current = pagination.current;
+                        state.pagination.pageSize = pagination.pageSize;
+                    }}
                     scroll={{ x: 1100 }}
                     style={{
                         borderRadius: '8px',
@@ -524,12 +478,12 @@ const SurveyList = () => {
             {/* 分享问卷的弹窗 */}
             <Modal
                 title={<div style={{ fontWeight: 600 }}>分享问卷</div>}
-                open={shareModalVisible}
-                onCancel={() => setShareModalVisible(false)}
+                open={state.shareModalVisible}
+                onCancel={() => state.shareModalVisible = false}
                 footer={[
                     <Button
                         key="close"
-                        onClick={() => setShareModalVisible(false)}
+                        onClick={() => state.shareModalVisible = false}
                         style={{ borderRadius: '6px' }}
                     >
                         关闭
@@ -555,8 +509,8 @@ const SurveyList = () => {
                 )}
             >
                 <Tabs
-                    activeKey={activeTab}
-                    onChange={setActiveTab}
+                    activeKey={state.activeTab}
+                    onChange={(tab) => state.activeTab = tab}
                     items={[
                         {
                             key: 'link',
@@ -571,7 +525,7 @@ const SurveyList = () => {
                                     <p style={{ marginBottom: '12px' }}>您可以通过以下链接分享此问卷给匿名参与者:</p>
                                     <Input
                                         readOnly
-                                        value={shareLink}
+                                        value={state.shareLink}
                                         style={{ borderRadius: '6px' }}
                                         addonAfter={
                                             <Tooltip title="复制链接" placement="top">
@@ -606,7 +560,7 @@ const SurveyList = () => {
                                         display: 'inline-block'
                                     }}>
                                         <QRCodeSVG
-                                            value={shareLink}
+                                            value={state.shareLink}
                                             size={200}
                                             level="H"
                                             includeMargin={true}
@@ -638,12 +592,12 @@ const SurveyList = () => {
                 <Divider style={{ margin: '16px 0' }} />
 
                 <div style={{ marginTop: 16 }}>
-                    <p style={{ margin: '8px 0' }}><strong>问卷标题:</strong> {currentSurvey?.title}</p>
+                    <p style={{ margin: '8px 0' }}><strong>问卷标题:</strong> {state.currentSurvey?.title}</p>
                     <p style={{ margin: '8px 0' }}>
                         <strong>问卷状态:</strong> {
-                            currentSurvey?.status === 1 ?
+                            state.currentSurvey?.status === 1 ?
                                 <Tag color="success">已发布</Tag> :
-                                currentSurvey?.status === 2 ?
+                                state.currentSurvey?.status === 2 ?
                                     <Tag color="error">已结束</Tag> :
                                     <Tag>草稿</Tag>
                         }
@@ -651,11 +605,11 @@ const SurveyList = () => {
                     <p style={{
                         margin: '8px 0',
                         padding: '8px 12px',
-                        background: currentSurvey?.status === 1 ? token.colorSuccessBg : token.colorErrorBg,
+                        background: state.currentSurvey?.status === 1 ? token.colorSuccessBg : token.colorErrorBg,
                         borderRadius: '6px'
                     }}>
                         <strong>注意:</strong> {
-                            currentSurvey?.status === 1
+                            state.currentSurvey?.status === 1
                                 ? '此问卷当前可以被作答。'
                                 : '此问卷当前不可作答，请先将状态修改为"已发布"。'
                         }
