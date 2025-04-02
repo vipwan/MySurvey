@@ -17,6 +17,7 @@ import QuestionList from './components/survey/QuestionList';
 import Dashboard from './components/dashboard/Dashboard';
 import About from './components/about/About';
 import AnonymousSurvey from './components/survey/AnonymousSurvey';
+import SystemSetting from './components/dashboard/SystemSetting';
 
 import './App.css';
 
@@ -104,6 +105,15 @@ function App() {
                                 element={
                                     <PrivateRoute>
                                         <About />
+                                    </PrivateRoute>
+                                }
+                            />
+
+                            <Route
+                                path="/system-settings"
+                                element={
+                                    <PrivateRoute>
+                                        <SystemSetting />
                                     </PrivateRoute>
                                 }
                             />

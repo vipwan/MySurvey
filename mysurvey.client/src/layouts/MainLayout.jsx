@@ -12,6 +12,7 @@ import {
     GithubOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
+    ToolOutlined
 } from '@ant-design/icons';
 import { useMount, useReactive, useTitle } from 'ahooks';
 import { PageContainer, ProLayout, WaterMark, ProSkeleton } from '@ant-design/pro-components';
@@ -74,6 +75,7 @@ const MainLayout = ({ children }) => {
         const path = location.pathname;
         if (path.startsWith('/surveys')) return '2';
         if (path === '/about') return '3';
+        if (path === '/system-settings') return '6';
         return '1'; // 默认首页
     };
 
@@ -121,6 +123,12 @@ const MainLayout = ({ children }) => {
             icon: <GatewayOutlined />,
             key: '5',
         }] : []),
+        {
+            path: '/system-settings',
+            name: '系统配置',
+            icon: <ToolOutlined />,
+            key: '6',
+        },
     ];
 
     // 用户头像下拉菜单
