@@ -169,7 +169,7 @@ const SurveyList = () => {
             },
             width: 250,
             render: title => (
-                <Tooltip color={ '#fff' } placement="topLeft" title={title}>
+                <Tooltip color={'#fff'} placement="topLeft" title={title}>
                     <span>{title}</span>
                 </Tooltip>
             ),
@@ -178,14 +178,13 @@ const SurveyList = () => {
             title: '状态',
             dataIndex: 'status',
             key: 'status',
-            width: 100,
+            width: 75,
             valueType: 'select',
             valueEnum: {
                 0: { text: '草稿', status: 'Default' },
                 1: { text: '已发布', status: 'Success' },
                 2: { text: '已结束', status: 'Error' },
             },
-            filters: false,
             render: (status) => {
                 const statusMap = {
                     0: { text: '草稿', color: 'default' },
@@ -200,15 +199,37 @@ const SurveyList = () => {
             title: '开始时间',
             dataIndex: 'startTime',
             key: 'startTime',
-            width: 120,
-            valueType: 'dateTime',
+            width: 110,
+            valueType: 'dateRange',
+            fieldProps: {
+                format: 'YYYY-MM-DD',
+            },
+            search: {
+                transform: (value) => {
+                    return {
+                        startTime: value,
+                    };
+                },
+            },
+            render: (_, record) => record.startTime ? dayjs(record.startTime).format('YYYY-MM-DD HH:mm') : '-',
         },
         {
             title: '结束时间',
             dataIndex: 'endTime',
             key: 'endTime',
-            width: 120,
-            valueType: 'dateTime',
+            width: 110,
+            valueType: 'dateRange',
+            fieldProps: {
+                format: 'YYYY-MM-DD',
+            },
+            search: {
+                transform: (value) => {
+                    return {
+                        endTime: value,
+                    };
+                },
+            },
+            render: (_, record) => record.endTime ? dayjs(record.endTime).format('YYYY-MM-DD  HH:mm') : '-',
         },
         {
             title: '操作',
@@ -419,7 +440,7 @@ const SurveyList = () => {
                 rowKey="id"
                 search={{
                     labelWidth: 'auto',
-                    defaultCollapsed: false,
+                    defaultCollapsed: true,
                     span: 6
                 }}
                 toolbar={{
@@ -486,7 +507,7 @@ const SurveyList = () => {
                 pagination={{
                     showQuickJumper: true,
                     showSizeChanger: true,
-                    pageSizeOptions: [10, 20, 50, 100],
+                    pageSizeOptions: [5,10, 20, 50],
                     defaultPageSize: 10,
                 }}
                 dateFormatter="string"

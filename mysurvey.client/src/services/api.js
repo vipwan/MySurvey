@@ -1,4 +1,6 @@
 ﻿import axios from 'axios';
+import { store } from '../store';  // 需要导入Redux store
+import { logout } from '../store/authSlice';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/' : 'http://localhost:5289';
 
@@ -56,6 +58,9 @@ api.interceptors.response.use(
             ) {
                 console.log('Unauthorized error detected, redirecting to login');
 
+                // 使用Redux dispatch logout action
+                store.dispatch(logout());
+
                 // 清除认证信息
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
@@ -64,6 +69,13 @@ api.interceptors.response.use(
                 if (window.location.pathname !== '/login') {
                     // 使用history API保留导航历史
                     window.location.href = '/login';
+
+                    // 返回一个已处理的错误，可以让组件知道已经处理了401错误
+                    return Promise.reject({
+                        ...error,
+                        handled: true,
+                        handledType: 'UNAUTHORIZED'
+                    });
                 }
             }
         }
@@ -85,6 +97,7 @@ export const authApi = {
     updateInfo: (data) => api.post('/account/manage/info', data),
 };
 
+// 问卷相关API
 // 问卷相关API
 export const surveyApi = {
 
@@ -142,6 +155,11 @@ export const surveyApi = {
 // 站点设置API
 export const siteSettingApi = {
     getSiteSetting: () => api.get('/api/siteSetting'),
+};
+
+// 辅助函数：检查错误是否已被处理（供组件使用）
+export const isErrorHandled = (error) => {
+    return error && error.handled === true;
 };
 
 export default api;

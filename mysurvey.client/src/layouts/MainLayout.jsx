@@ -1,8 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { Button, Typography, Avatar, Dropdown, message } from 'antd';
+import { Typography, Dropdown, message, Switch } from 'antd';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-    PlusOutlined,
     HomeOutlined,
     UnorderedListOutlined,
     InfoCircleOutlined,
@@ -10,14 +9,15 @@ import {
     LogoutOutlined,
     SettingOutlined,
     GatewayOutlined,
+    GithubOutlined,
+    MenuFoldOutlined,
+    MenuUnfoldOutlined,
 } from '@ant-design/icons';
 import { useMount, useReactive, useTitle } from 'ahooks';
 import { PageContainer, ProLayout, WaterMark, ProSkeleton } from '@ant-design/pro-components';
 import { useDispatch } from 'react-redux';
 import { logout } from '../store/authSlice';
 import { authApi, siteSettingApi } from '../services/api';
-
-const { Title } = Typography;
 
 const MainLayout = ({ children }) => {
     const navigate = useNavigate();
@@ -32,7 +32,8 @@ const MainLayout = ({ children }) => {
             icp: '',
             customerServicePhone: ''
         },
-        loading: true
+        loading: true,
+        layoutMode:'top'
     });
 
     // 加载用户信息
@@ -83,6 +84,11 @@ const MainLayout = ({ children }) => {
         navigate('/login');
     };
 
+    // 切换布局模式
+    const toggleLayout = () => {
+        state.layoutMode = state.layoutMode === 'side' ? 'top' : 'side';
+    };
+
     // 菜单项配置
     const menuItems = [
         {
@@ -103,6 +109,12 @@ const MainLayout = ({ children }) => {
             icon: <InfoCircleOutlined />,
             key: '3',
         },
+        {
+            path: 'https://github.com/vipwan/MySurvey',
+            name: 'GitHub',
+            icon: <GithubOutlined />,
+            key: '4',
+        },
     ];
 
     // 用户头像下拉菜单
@@ -118,6 +130,21 @@ const MainLayout = ({ children }) => {
             icon: <SettingOutlined />,
             label: '设置',
             onClick: () => navigate('/profile'),
+        },
+        {
+            key: 'layout',
+            icon: state.layoutMode === 'side' ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />,
+            label: (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>侧边布局</span>
+                    <Switch
+                        checked={state.layoutMode === 'side'}
+                        onChange={toggleLayout}
+                        size="small"
+                        style={{ marginLeft: 8 }}
+                    />
+                </div>
+            ),
         },
         {
             type: 'divider',
@@ -139,7 +166,7 @@ const MainLayout = ({ children }) => {
             <ProLayout
                 title={state.siteSettings.siteName}
                 logo={<GatewayOutlined />}
-                layout="top"
+                layout={state.layoutMode}
                 navTheme="dark"
                 headerTheme="dark"
                 fixedHeader
@@ -148,7 +175,6 @@ const MainLayout = ({ children }) => {
                     <Link to={item.path}>{dom}</Link>
                 )}
                 menuDataRender={() => menuItems}
-
                 headerStyle={{
                     backgroundColor: '#1765bd', // 设置头部的背景色，与菜单保持一致
                 }}
@@ -158,33 +184,28 @@ const MainLayout = ({ children }) => {
                     title: userInfo?.userName || '用户',
                     render: (props, dom) => {
                         return (
-                            <Dropdown
-                                menu={{
-                                    items: avatarDropdownItems
-                                }}
-                                placement="bottomRight"
-                            >
-                                {dom}
-                            </Dropdown>
+                            <>
+                                <Dropdown
+                                    menu={{
+                                        items: avatarDropdownItems
+                                    }}
+                                    placement="bottomRight">
+                                    
+                                    {dom}
+                                </Dropdown>
+                                <SettingOutlined />
+                            </>
+
                         );
                     },
                 }}
-                rightContentRender={() => (
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => navigate('/surveys/create')}
-                    >
-                        添加调查
-                    </Button>
-                )}
                 footerRender={() => (
-                    <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <div style={{ textAlign: 'center', padding: '10px 0' }}>
                         <div>{state.siteSettings.siteName} &copy; {new Date().getFullYear()} 版权所有</div>
                         {state.siteSettings.siteDescription && (
-                            <div style={{ marginTop: 8 }}>{state.siteSettings.siteDescription}</div>
+                            <div style={{ marginTop: 5 }}>{state.siteSettings.siteDescription}</div>
                         )}
-                        <div style={{ marginTop: 8 }}>
+                        <div style={{ marginTop: 5 }}>
                             {state.siteSettings.icp && <span>{state.siteSettings.icp}</span>}
                             {state.siteSettings.customerServicePhone && (
                                 <span style={{ marginLeft: 16 }}>客服电话: {state.siteSettings.customerServicePhone}</span>
