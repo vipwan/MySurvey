@@ -173,7 +173,6 @@ public interface ISurveyService
     /// </summary>
     /// <param name="userId"></param>
     /// <returns></returns>
-    [AutoCache(30)] //使用CachingProxyFactory<ISurveyService>代理工厂生成的服务将会命中缓存.默认缓存30s
     Task<(int SurveyCount, int SurveyCompleteCount, int AnswerCount, int UserCount)> StatAsync(string userId);
 
 }
