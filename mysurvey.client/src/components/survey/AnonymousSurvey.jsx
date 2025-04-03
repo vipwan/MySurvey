@@ -4,6 +4,43 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useRequest, useTitle, useLockFn } from 'ahooks';
 import { surveyApi } from '../../services/api';
 
+const SurveyStatus = {
+    Draft: 0,
+    Published: 1,
+    Ended: 2,
+    Deleted: 3
+};
+
+const getSurveyStatusMessage = (status) => {
+    switch (status) {
+        case SurveyStatus.Draft:
+            return {
+                status: 'warning',
+                title: '问卷未发布',
+                subTitle: '此问卷正在编辑中，暂未发布'
+            };
+        case SurveyStatus.Ended:
+            return {
+                status: 'info',
+                title: '问卷已结束',
+                subTitle: '此问卷已结束收集'
+            };
+        case SurveyStatus.Deleted:
+            return {
+                status: 'error',
+                title: '问卷已删除',
+                subTitle: '此问卷已被删除'
+            };
+        default:
+            return {
+                status: 'error',
+                title: '问卷不可用',
+                subTitle: '此问卷当前不可访问'
+            };
+    }
+};
+
+
 // 问题类型枚举（与后端QuestionType保持一致）
 const QuestionType = {
     SingleChoice: 0,      // 单选题
@@ -254,6 +291,55 @@ const AnonymousSurvey = () => {
                 status="error"
                 title="问卷不存在"
                 subTitle="该问卷可能已被删除或未发布"
+                extra={
+                    <Button type="primary" onClick={() => navigate('/')}>
+                        返回首页
+                    </Button>
+                }
+            />
+        );
+    }
+
+    // 检查问卷状态
+    if (survey.status !== SurveyStatus.Published) {
+        const statusMessage = getSurveyStatusMessage(survey.status);
+        return (
+            <Result
+                status={statusMessage.status}
+                title={statusMessage.title}
+                subTitle={statusMessage.subTitle}
+                extra={
+                    <Button type="primary" onClick={() => navigate('/')}>
+                        返回首页
+                    </Button>
+                }
+            />
+        );
+    }
+
+    // 检查问卷时间
+    const now = new Date();
+    if (new Date(survey.startTime) > now) {
+        return (
+            <Result
+                status="info"
+                title="问卷未开始"
+                subTitle={`此问卷将于 ${new Date(survey.startTime).toLocaleString()} 开始收集`}
+                extra={
+                    <Button type="primary" onClick={() => navigate('/')}>
+                        返回首页
+                    </Button>
+                }
+            />
+        );
+    }
+
+    if (new Date(survey.endTime) < now) {
+        return (
+            <Result
+                status="info"
+                title="问卷已结束"
+                subTitle={`此问卷已于 ${new Date(survey.endTime).toLocaleString()} 结束收集`}
                 extra={
                     <Button type="primary" onClick={() => navigate('/')}>
                         返回首页

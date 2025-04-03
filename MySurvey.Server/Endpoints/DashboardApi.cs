@@ -10,23 +10,30 @@ using System.Security.Claims;
 
 namespace MySurvey.Server.Endpoints;
 
+/// <summary>
+/// 返回的统计数据
+/// </summary>
+/// <param name="SurveyCount"></param>
+/// <param name="SurveyCompleteCount"></param>
+/// <param name="AnswerCount"></param>
+/// <param name="UserCount"></param>
 public record StatData(int SurveyCount,int SurveyCompleteCount,int AnswerCount,int UserCount);
 
 [Authorize]
 [QuickApi("/dashboard-data")]
 [OpenApiMetadata("面板统计", "面板统计数据")]
-public class DashboardApi(ISurveyService surveyService, IHttpContextAccessor httpContextAccessor) : BaseQuickApi
+[AuditApi] // 审计API
+public class DashboardApi(ISurveyService surveyService, IHttpContextAccessor httpContextAccessor) : BaseQuickApi<EmptyRequest, StatData>
 {
-    public override async ValueTask<IResult> ExecuteAsync(EmptyRequest request, CancellationToken cancellationToken = default)
+    public override async ValueTask<StatData> ExecuteAsync(EmptyRequest request, CancellationToken cancellationToken = default)
     {
         var userId = httpContextAccessor.HttpContext!.User.FindFirstValue(ClaimTypes.NameIdentifier);
         var (surveyCount, surveyCompleteCount, answerCount, userCount) = await surveyService.StatAsync(userId!);
 
-        return Results.Json(
-            new StatData(
+        return new StatData(
             surveyCount,
             surveyCompleteCount,
             answerCount,
-            userCount));
+            userCount);
     }
 }

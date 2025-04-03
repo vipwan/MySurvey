@@ -18,6 +18,7 @@ namespace MySurvey.Server.Endpoints;
 [Authorize]
 [QuickApi("/surveys/{id}/export")]
 [OpenApiMetadata("导出问卷答案", "导出问卷答案")]
+[AuditApi] // 审计API,更多信息请参考:https://github.com/vipwan/Biwen.QuickApi/blob/master/Biwen.QuickApi.DocSite/seed/articles/Auditing.md
 public class ExportApi(IHttpContextAccessor httpContextAccessor,IExportService exportService) : BaseQuickApi
 {
     public override async ValueTask<IResult> ExecuteAsync(EmptyRequest request, CancellationToken cancellationToken = default)

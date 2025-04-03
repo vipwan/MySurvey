@@ -20,11 +20,12 @@ namespace MySurvey.Core.Services;
 /// </summary>
 [AutoInject<ISurveyService>]
 public class SurveyService(
-    ApplicationDbContext context,
+    IUnitOfWork<ApplicationDbContext> unitOfWork,
     ILogger<SurveyService> logger) : ISurveyService
 {
-    private readonly ApplicationDbContext _context = context;
+    private readonly IUnitOfWork<ApplicationDbContext> _unitOfWork = unitOfWork;
     private readonly ILogger<SurveyService> _logger = logger;
+
 
     /// <summary>
     /// 创建问卷
@@ -34,8 +35,8 @@ public class SurveyService(
         survey.Status = SurveyStatus.Draft;
         survey.CreatedAt = DateTime.Now;
 
-        _context.Surveys.Add(survey);
-        await _context.SaveChangesAsync(cancellationToken);
+        _unitOfWork.GetRepository<Survey>().Insert(survey);
+        await _unitOfWork.SaveChangesAsync();
 
         await new SurveyCreatedEvent(survey).PublishAsync(cancellationToken);
         return survey;
@@ -46,14 +47,8 @@ public class SurveyService(
     /// </summary>
     public async Task<Survey> UpdateSurveyAsync(Survey survey, CancellationToken cancellationToken = default)
     {
-        var existingSurvey = await _context.Surveys
-            .Include(s => s.Questions)
-            .FirstOrDefaultAsync(s => s.Id == survey.Id, cancellationToken);
-
-        if (existingSurvey == null)
-        {
-            throw new KeyNotFoundException($"问卷 {survey.Id} 不存在");
-        }
+        var existingSurvey = await _unitOfWork.GetRepository<Survey>().FindAsync([survey.Id], cancellationToken)
+            ?? throw new KeyNotFoundException($"问卷 {survey.Id} 不存在");
 
         //if (existingSurvey.Status != SurveyStatus.Draft)
         //{
@@ -67,7 +62,7 @@ public class SurveyService(
 
         existingSurvey.UpdatedAt = DateTime.Now;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync();
 
         await new SurveyUpdatedEvent(existingSurvey).PublishAsync(cancellationToken);
         return existingSurvey;
@@ -78,19 +73,18 @@ public class SurveyService(
     /// </summary>
     public async Task DeleteSurveyAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var survey = await _context.Surveys.FindAsync(id, cancellationToken);
-        if (survey == null)
-        {
-            throw new KeyNotFoundException($"问卷 {id} 不存在");
-        }
+        var repository = _unitOfWork.GetRepository<Survey>();
+
+        var survey = await repository.FindAsync([id], cancellationToken) 
+            ?? throw new KeyNotFoundException($"问卷 {id} 不存在");
 
         if (survey.Status != SurveyStatus.Draft)
         {
             throw new InvalidOperationException("只能删除草稿状态的问卷");
         }
 
-        _context.Surveys.Remove(survey);
-        await _context.SaveChangesAsync(cancellationToken);
+        repository.Delete(survey);
+        await _unitOfWork.SaveChangesAsync();
 
         await new SurveyDeletedEvent(id).PublishAsync(cancellationToken);
     }
@@ -100,12 +94,13 @@ public class SurveyService(
     /// </summary>
     public async Task<Survey?> GetSurveyAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Surveys
-            .Include(s => s.Questions)
+        return await _unitOfWork.GetRepository<Survey>().GetFirstOrDefaultAsync(
+            s => s.Id == id,
+            disableTracking:false,//不禁止追踪
+            include:
+            s => s.Include(s => s.Questions)
                 .ThenInclude(q => q.Options)
-            .Include(s => s.Answers)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+                .Include(s => s.Answers));
     }
 
     /// <summary>
@@ -138,7 +133,7 @@ public class SurveyService(
         if (pageSize > 100) pageSize = 100; // 限制最大页大小
 
         // 构建基础查询
-        var query = _context.Surveys
+        var query = _unitOfWork.DbContext.Surveys
             .Include(s => s.Questions)
             .Include(s => s.Answers)
             .Where(s => s.UserId == userId);
@@ -194,16 +189,13 @@ public class SurveyService(
     /// </summary>
     public async Task<Survey> PublishSurveyAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var survey = await _context.Surveys.FindAsync(id, cancellationToken);
-        if (survey == null)
-        {
-            throw new KeyNotFoundException($"问卷 {id} 不存在");
-        }
+        var survey = await _unitOfWork.GetRepository<Survey>().FindAsync([id]) 
+            ?? throw new KeyNotFoundException($"问卷 {id} 不存在");
 
         //当前都可以发布
         survey.Status = SurveyStatus.Published;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync();
 
         await new SurveyPublishedEvent(survey).PublishAsync(cancellationToken);
         return survey;
@@ -214,11 +206,8 @@ public class SurveyService(
     /// </summary>
     public async Task<Survey> EndSurveyAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var survey = await _context.Surveys.FindAsync(id, cancellationToken);
-        if (survey == null)
-        {
-            throw new KeyNotFoundException($"问卷 {id} 不存在");
-        }
+        var survey = await _unitOfWork.GetRepository<Survey>().FindAsync([id]) 
+            ?? throw new KeyNotFoundException($"问卷 {id} 不存在");
 
         if (survey.Status != SurveyStatus.Published)
         {
@@ -227,7 +216,7 @@ public class SurveyService(
 
         survey.Status = SurveyStatus.Ended;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync();
 
         await new SurveyEndedEvent(survey).PublishAsync(cancellationToken);
         return survey;
@@ -238,7 +227,7 @@ public class SurveyService(
     /// </summary>
     public async Task<SurveyAnswer> SubmitSurveyAnswerAsync(SurveyAnswer answer, CancellationToken cancellationToken = default)
     {
-        var survey = await _context.Surveys
+        var survey = await _unitOfWork.DbContext.Surveys
             .Include(s => s.Questions)
                 .ThenInclude(q => q.Options)
             .FirstOrDefaultAsync(s => s.Id == answer.SurveyId, cancellationToken);
@@ -315,11 +304,11 @@ public class SurveyService(
         }
 
         // 添加答卷及其关联实体
-        _context.SurveyAnswers.Add(answer);
+        _unitOfWork.GetRepository<SurveyAnswer>().Insert(answer);
         
         try
         {
-            await _context.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.SaveChangesAsync();
             await new SurveyAnswerSubmittedEvent(answer).PublishAsync(cancellationToken);
             return answer;
         }
@@ -369,7 +358,7 @@ public class SurveyService(
     /// </summary>
     public async Task<IEnumerable<SurveyAnswer>> GetSurveyAnswersAsync(Guid surveyId, CancellationToken cancellationToken = default)
     {
-        return await _context.SurveyAnswers
+        return await _unitOfWork.DbContext.SurveyAnswers
             .Include(a => a.QuestionAnswers)
             .Where(a => a.SurveyId == surveyId)
             .OrderByDescending(a => a.SubmitTime)
@@ -381,7 +370,7 @@ public class SurveyService(
     /// </summary>
     public async Task<SurveyAnswer?> GetSurveyAnswerAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.SurveyAnswers
+        return await _unitOfWork.DbContext.SurveyAnswers
             .Include(a => a.QuestionAnswers)
                 .ThenInclude(qa => qa.Question)
                     .ThenInclude(q => q.Options)
@@ -399,11 +388,8 @@ public class SurveyService(
     /// </summary>
     public async Task<Survey> UpdateSurveyStatusAsync(Guid id, SurveyStatus status, CancellationToken cancellationToken = default)
     {
-        var survey = await _context.Surveys.FindAsync(id, cancellationToken);
-        if (survey == null)
-        {
-            throw new KeyNotFoundException($"问卷 {id} 不存在");
-        }
+        var survey = await _unitOfWork.GetRepository<Survey>().FindAsync([id]) 
+            ?? throw new KeyNotFoundException($"问卷 {id} 不存在");
 
         // 验证状态转换的合法性
         if (status == SurveyStatus.Published && survey.Status != SurveyStatus.Draft)
@@ -419,7 +405,7 @@ public class SurveyService(
         survey.Status = status;
         survey.UpdatedAt = DateTime.Now;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync();
 
         // 发布相应的事件
         switch (status)
@@ -443,7 +429,7 @@ public class SurveyService(
     /// </summary>
     public async Task<SurveyQuestion?> GetQuestionAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.SurveyQuestions
+        return await _unitOfWork.DbContext.SurveyQuestions
             .Include(q => q.Survey)
             .Include(q => q.Options)
             .FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
@@ -468,11 +454,8 @@ public class SurveyService(
         string? validationErrorMessage = null,
         CancellationToken cancellationToken = default)
     {
-        var survey = await _context.Surveys.FindAsync(surveyId, cancellationToken);
-        if (survey == null)
-        {
-            throw new KeyNotFoundException($"问卷 {surveyId} 不存在");
-        }
+        var survey = await _unitOfWork.GetRepository<Survey>().FindAsync([surveyId]) 
+            ?? throw new KeyNotFoundException($"问卷 {surveyId} 不存在");
 
         if (survey.Status != SurveyStatus.Draft)
         {
@@ -495,18 +478,19 @@ public class SurveyService(
             Survey = survey
         };
 
-        _context.SurveyQuestions.Add(question);
-        await _context.SaveChangesAsync(cancellationToken);
+        _unitOfWork.GetRepository<SurveyQuestion>().Insert(question);
+
+        await _unitOfWork.SaveChangesAsync();
 
         // 添加选项
         foreach (var option in options)
         {
             option.Id = Guid.NewGuid();
             option.QuestionId = question.Id;
-            _context.SurveyOptions.Add(option);
+            _unitOfWork.GetRepository<SurveyOption>().Insert(option);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync();
 
         await new SurveyQuestionAddedEvent(question).PublishAsync(cancellationToken);
         return question;
@@ -532,15 +516,11 @@ public class SurveyService(
         string? validationErrorMessage = null,
         CancellationToken cancellationToken = default)
     {
-        var question = await _context.SurveyQuestions
+        var question = await _unitOfWork.DbContext.SurveyQuestions
             .Include(q => q.Survey)
             .Include(q => q.Options)
-            .FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
-
-        if (question == null)
-        {
-            throw new KeyNotFoundException($"问题 {id} 不存在");
-        }
+            .FirstOrDefaultAsync(q => q.Id == id, cancellationToken) 
+            ?? throw new KeyNotFoundException($"问题 {id} 不存在");
 
         //if (question.Survey.Status != SurveyStatus.Draft)
         //{
@@ -559,17 +539,17 @@ public class SurveyService(
         question.ValidationErrorMessage = validationErrorMessage;
 
         // 删除旧选项
-        _context.SurveyOptions.RemoveRange(question.Options);
+        _unitOfWork.DbContext.SurveyOptions.RemoveRange(question.Options);
 
         // 添加新选项
         foreach (var option in options)
         {
             option.Id = Guid.NewGuid();
             option.QuestionId = question.Id;
-            _context.SurveyOptions.Add(option);
+            _unitOfWork.GetRepository<SurveyOption>().Insert(option);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync();
 
         await new SurveyQuestionUpdatedEvent(question).PublishAsync(cancellationToken);
         return question;
@@ -580,7 +560,7 @@ public class SurveyService(
     /// </summary>
     public async Task DeleteQuestionAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var question = await _context.SurveyQuestions
+        var question = await _unitOfWork.DbContext.SurveyQuestions
             .Include(q => q.Survey)
             .FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
 
@@ -594,8 +574,8 @@ public class SurveyService(
             throw new InvalidOperationException("只能删除草稿状态的问卷");
         }
 
-        _context.SurveyQuestions.Remove(question);
-        await _context.SaveChangesAsync(cancellationToken);
+        _unitOfWork.DbContext.SurveyQuestions.Remove(question);
+        await _unitOfWork.DbContext.SaveChangesAsync(cancellationToken);
 
         await new SurveyQuestionDeletedEvent(question).PublishAsync(cancellationToken);
     }
@@ -605,7 +585,7 @@ public class SurveyService(
     /// </summary>
     public async Task<IEnumerable<SurveyAnswer>> SubmitSurveyAnswersAsync(Guid surveyId, IEnumerable<SurveyAnswer> answers, CancellationToken cancellationToken = default)
     {
-        var survey = await _context.Surveys.FindAsync(surveyId, cancellationToken);
+        var survey = await _unitOfWork.DbContext.Surveys.FindAsync(surveyId, cancellationToken);
         if (survey == null)
         {
             throw new KeyNotFoundException($"问卷 {surveyId} 不存在");
@@ -627,10 +607,10 @@ public class SurveyService(
             answer.SurveyId = surveyId;
             answer.SubmitTime = DateTime.Now;
             answer.Status = AnswerStatus.Submitted;
-            _context.SurveyAnswers.Add(answer);
+            _unitOfWork.DbContext.SurveyAnswers.Add(answer);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.DbContext.SaveChangesAsync(cancellationToken);
 
         foreach (var answer in answers)
         {
@@ -645,7 +625,7 @@ public class SurveyService(
     /// </summary>
     public async Task<Survey> CopySurveyAsync(Guid surveyId, string userId, CancellationToken cancellationToken = default)
     {
-        var sourceSurvey = await _context.Surveys
+        var sourceSurvey = await _unitOfWork.DbContext.Surveys
             .Include(s => s.Questions)
                 .ThenInclude(q => q.Options)
             .FirstOrDefaultAsync(s => s.Id == surveyId, cancellationToken);
@@ -668,7 +648,7 @@ public class SurveyService(
             CreatedAt = DateTime.Now,
         };
 
-        _context.Surveys.Add(newSurvey);
+        _unitOfWork.DbContext.Surveys.Add(newSurvey);
 
         // 复制问题
         foreach (var question in sourceSurvey.Questions.OrderBy(q => q.Order))
@@ -687,7 +667,7 @@ public class SurveyService(
                 ValidationErrorMessage = question.ValidationErrorMessage,
             };
 
-            _context.SurveyQuestions.Add(newQuestion);
+            _unitOfWork.DbContext.SurveyQuestions.Add(newQuestion);
 
             // 复制选项
             foreach (var option in question.Options)
@@ -704,11 +684,11 @@ public class SurveyService(
                     IsMatrixColumn = option.IsMatrixColumn
                 };
 
-                _context.SurveyOptions.Add(newOption);
+                _unitOfWork.DbContext.SurveyOptions.Add(newOption);
             }
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.DbContext.SaveChangesAsync(cancellationToken);
 
         await new SurveyCreatedEvent(newSurvey).PublishAsync(cancellationToken);
         return newSurvey;
@@ -716,7 +696,7 @@ public class SurveyService(
 
     public async Task<IEnumerable<Survey>> GetSurveysAsync(string? userId, DateTime? st, DateTime? et, SurveyStatus status = SurveyStatus.Published, CancellationToken cancellationToken = default)
     {
-        var query = _context.Surveys.AsQueryable();
+        var query = _unitOfWork.DbContext.Surveys.AsQueryable();
         if (userId!=null)
         {
             query = query.Where(s => s.UserId == userId);
@@ -739,20 +719,20 @@ public class SurveyService(
 
     public async Task<(int SurveyCount, int SurveyCompleteCount, int AnswerCount, int UserCount)> StatAsync(string userId)
     {
-        var surveyCount = await _context.Surveys.CountAsync(s => s.UserId == userId);
-        var surveyCompleteCount = await _context.Surveys.CountAsync(s => s.UserId == userId && s.Status == SurveyStatus.Ended);
+        var surveyCount = await _unitOfWork.DbContext.Surveys.CountAsync(s => s.UserId == userId);
+        var surveyCompleteCount = await _unitOfWork.DbContext.Surveys.CountAsync(s => s.UserId == userId && s.Status == SurveyStatus.Ended);
 
         //查询当前用户问卷的所有答案数量:
-        var answerCount = await _context.SurveyAnswers
-            .Where(a => _context.Surveys
+        var answerCount = await _unitOfWork.DbContext.SurveyAnswers
+            .Where(a => _unitOfWork.DbContext.Surveys
                 .Where(s => s.UserId == userId)
                 .Select(s => s.Id)
                 .Contains(a.SurveyId))
             .CountAsync();
 
         // Count distinct users who have submitted answers to the user's surveys
-        var userCount = await _context.SurveyAnswers
-            .Where(a => _context.Surveys
+        var userCount = await _unitOfWork.DbContext.SurveyAnswers
+            .Where(a => _unitOfWork.DbContext.Surveys
                 .Where(s => s.UserId == userId)
                 .Select(s => s.Id)
                 .Contains(a.SurveyId))

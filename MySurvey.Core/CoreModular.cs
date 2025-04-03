@@ -5,6 +5,7 @@
 using Biwen.QuickApi.Abstractions.Modular;
 using Biwen.QuickApi.OpenApi;
 using Biwen.QuickApi.OpenApi.Scalar;
+using Biwen.QuickApi.UnitOfWork;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -68,6 +69,9 @@ public class CoreModular(IConfiguration configuration,IWebHostEnvironment env) :
             // 配置SQLite
             builder.UseSqlite(configuration.GetConnectionString("DefaultConnection"));
         });
+
+        //提供uow支持
+        services.AddUnitOfWork<ApplicationDbContext>();
 
         services.ConfigureApplicationCookie(o =>
         {

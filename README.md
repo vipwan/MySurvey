@@ -66,6 +66,20 @@ MySurvey/
     └── public/             # 静态资源
 ```
 
+
+## 提供的样板用例包括:
+- Biwen.QuickApi QuickApi Api接口&模型验证
+- Biwen.QuickApi ScheduleTasks  轮询作业
+- Biwen.QuickApi EFCore&Uow
+- Biwen.QuickApi 模块化
+- Biwen.QuickApi 事件驱动
+- Biwen.QuickApi 审计
+- Biwen.AutoClassGen AutoInject 源生成自动注入
+- Biwen.Settings 配置管理
+- etc.
+
+
+
 ## 快速开始
 
 ### 环境要求

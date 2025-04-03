@@ -2,6 +2,7 @@
 // The MySurvey.Core licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using Biwen.QuickApi.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
 using MySurvey.Core.Data;
 using MySurvey.Core.Entities;
@@ -16,7 +17,7 @@ namespace MySurvey.Core.Services;
 /// 导出服务实现
 /// </summary>
 [AutoInject<IExportService>]
-public class ExportService(ApplicationDbContext context) : IExportService
+public class ExportService(IUnitOfWork<ApplicationDbContext> uow) : IExportService
 {
 
     /// <summary>
@@ -25,7 +26,7 @@ public class ExportService(ApplicationDbContext context) : IExportService
     public async Task<MemoryStream> ExportSurveyAnswersToExcelAsync(Guid surveyId,string userId, CancellationToken cancellationToken = default)
     {
         // 获取问卷信息
-        var survey = await context.Surveys
+        var survey = await uow.DbContext.Surveys
             .Where(x=>x.UserId == userId)//必须是当前用户的问卷
             .Include(s => s.Questions)
                 .ThenInclude(q => q.Options)
@@ -37,7 +38,7 @@ public class ExportService(ApplicationDbContext context) : IExportService
         }
 
         // 获取所有答卷
-        var answers = await context.SurveyAnswers
+        var answers = await uow.DbContext.SurveyAnswers
             .Include(a => a.QuestionAnswers)
                 .ThenInclude(qa => qa.Question)
                     .ThenInclude(q => q.Options)
@@ -128,7 +129,7 @@ public class ExportService(ApplicationDbContext context) : IExportService
         }
 
         // 单选题和多选题
-        if (answer.OptionIds != null && answer.OptionIds.Any())
+        if (answer.OptionIds != null && answer.OptionIds.Count != 0)
         {
             var options = new List<string>();
             foreach (var optionId in answer.OptionIds)

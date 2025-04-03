@@ -9,6 +9,7 @@ namespace MySurvey.Core.Apis;
 
 [QuickApi("/siteSetting")]
 [OpenApiMetadata("获取站点设置", "获取站点设置")]
+[AuditApi]
 public class SiteSettingApi(SiteSetting siteSetting) : BaseQuickApi<EmptyRequest, SiteSetting>
 {
     public override ValueTask<SiteSetting> ExecuteAsync(EmptyRequest request, CancellationToken cancellationToken = default)
