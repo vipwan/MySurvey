@@ -1,4 +1,4 @@
-﻿using System.IO;
+﻿// See the LICENSE file in the project root for more information.
 
 namespace MySurvey.Core.Interfaces;
 
