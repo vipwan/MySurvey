@@ -5,6 +5,7 @@
 using Biwen.QuickApi;
 using Biwen.QuickApi.Attributes;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.FeatureManagement.Mvc;
 using MySurvey.Core.Interfaces;
 using System.Security.Claims;
 
@@ -18,7 +19,11 @@ namespace MySurvey.Server.Endpoints;
 [Authorize]
 [QuickApi("/surveys/{id}/export")]
 [OpenApiMetadata("导出问卷答案", "导出问卷答案")]
+
 [AuditApi] // 审计API,更多信息请参考:https://github.com/vipwan/Biwen.QuickApi/blob/master/Biwen.QuickApi.DocSite/seed/articles/Auditing.md
+
+[FeatureGate("export")] // 特性开关 演示. 请配置FeatureManagement:export=true,如果是false,则不显示该API抛出404异常
+
 public class ExportApi(IHttpContextAccessor httpContextAccessor,IExportService exportService) : BaseQuickApi
 {
     public override async ValueTask<IResult> ExecuteAsync(EmptyRequest request, CancellationToken cancellationToken = default)

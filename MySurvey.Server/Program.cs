@@ -8,10 +8,6 @@ using MySurvey.Core.Data;
 using MySurvey.Server.Endpoints;
 using OfficeOpenXml;
 
-//verison 
-Console.WriteLine($"Biwen.QuickApi Version:{Biwen.QuickApi.Generated.Version.AssemblyVersion}");
-Console.WriteLine($"Biwen.QuickApi Author:{Biwen.QuickApi.Generated.AssemblyMetadata.Company}");
-
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
 var builder = WebApplication.CreateBuilder(args);
