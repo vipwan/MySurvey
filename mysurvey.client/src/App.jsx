@@ -18,6 +18,7 @@ import Dashboard from './components/dashboard/Dashboard';
 import About from './components/about/About';
 import AnonymousSurvey from './components/survey/AnonymousSurvey';
 import SystemSetting from './components/dashboard/SystemSetting';
+import InfoPage from './components/contents/InfoPage';
 
 import './App.css';
 
@@ -96,6 +97,15 @@ function App() {
                                 element={
                                     <PrivateRoute>
                                         <div>个人设置页面(待实现)</div>
+                                    </PrivateRoute>
+                                }
+                            />
+
+                            <Route
+                                path="/cms"
+                                element={
+                                    <PrivateRoute>
+                                        <InfoPage />
                                     </PrivateRoute>
                                 }
                             />

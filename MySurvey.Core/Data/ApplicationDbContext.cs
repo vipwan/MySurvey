@@ -2,6 +2,7 @@
 // The MySurvey.Core licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using Biwen.QuickApi.Contents.Domain;
 using Biwen.Settings.Domains;
 using Biwen.Settings.SettingStores.EFCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -11,9 +12,13 @@ using MySurvey.Core.Entities;
 namespace MySurvey.Core.Data;
 
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) :
-    IdentityDbContext(options), IBiwenSettingsDbContext
+    IdentityDbContext(options), 
+    IBiwenSettingsDbContext,
+    IContentDbContext
 {
     public DbSet<Setting> Settings { get; set; } = null!;
+
+    public DbSet<Content> Contents { get; set; } = null!;
 
 
     // 问卷调查相关
@@ -32,7 +37,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         //重命名表名
         modelBuilder.Entity<Setting>().ToTable("SystemSettings");
-
+        modelBuilder.Entity<Content>().ToTable("SystemContents");
 
         // 配置 Survey
         modelBuilder.Entity<Survey>(entity =>

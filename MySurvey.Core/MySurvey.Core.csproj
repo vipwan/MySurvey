@@ -28,4 +28,8 @@
     <Folder Include="Models\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Biwen.QuickApi.Contents\Biwen.QuickApi.Contents.csproj" />
+  </ItemGroup>
+
 </Project>

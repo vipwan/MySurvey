@@ -3,6 +3,7 @@ import { Dropdown, message, Switch } from 'antd';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     HomeOutlined,
+    BookOutlined,
     UnorderedListOutlined,
     InfoCircleOutlined,
     UserOutlined,
@@ -105,6 +106,14 @@ const MainLayout = ({ children }) => {
             icon: <UnorderedListOutlined />,
             key: '2',
         },
+
+        {
+            path: '/cms',
+            name: '内容中心',
+            icon: <BookOutlined />,
+            key: '7',
+        },
+
         {
             path: '/about',
             name: '关于',
