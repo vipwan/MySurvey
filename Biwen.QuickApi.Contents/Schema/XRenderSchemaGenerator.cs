@@ -116,9 +116,16 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
 
         // 获取显示名称特性
         var displayAttr = property.GetCustomAttribute<DisplayAttribute>();
+        // 获取DisplayName特性
+        var displayNameAttr = property.GetCustomAttribute<DisplayNameAttribute>();
+
         if (displayAttr != null && !string.IsNullOrEmpty(displayAttr.Name))
         {
             schema["title"] = displayAttr.Name;
+        }
+        else if (displayNameAttr != null && !string.IsNullOrEmpty(displayNameAttr.DisplayName))
+        {
+            schema["title"] = displayNameAttr.DisplayName;
         }
         else
         {
@@ -274,7 +281,7 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
             // 添加组件属性
             if (props.Count > 0)
             {
-                schema["x-component-props"] = props;
+                schema["props"] = props;
             }
         }
         // 处理URL字段类型
@@ -293,7 +300,7 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
             {
                 ["placeholder"] = "请输入URL"
             };
-            schema["x-component-props"] = props;
+            schema["props"] = props;
             schema["props"] = new JsonObject
             {
                 ["placeholder"] = "请输入URL"
@@ -348,7 +355,7 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
             // 添加组件属性
             if (props.Count > 0)
             {
-                schema["x-component-props"] = props;
+                schema["props"] = props;
             }
         }
         // 处理Markdown字段类型
@@ -385,12 +392,26 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 ["showTime"] = showTime
             };
 
-            schema["x-component-props"] = props;
+            schema["props"] = props;
             schema["props"] = new JsonObject
             {
                 ["showTime"] = showTime
             };
         }
+        // 处理时间字段类型
+        else if (propertyType == typeof(TimeFieldType))
+        {
+            schema["type"] = "string";
+            schema["widget"] = "timePicker";
+            schema["x-component"] = "TimePicker";
+            // 处理默认值
+            ProcessDefaultValue(property, schema, typeof(string));
+            schema["props"] = new JsonObject
+            {
+                ["format"] = "HH:mm:ss"
+            };
+        }
+
         // 处理整数字段类型
         else if (propertyType == typeof(IntegerFieldType))
         {
@@ -421,13 +442,13 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 props["max"] = Convert.ToDouble(rangeAttr.Maximum);
             }
 
-            schema["x-component-props"] = props;
+            schema["props"] = props;
 
             // 添加错误消息
-            schema["message"] = new JsonObject
-            {
-                ["required"] = ""
-            };
+            //schema["message"] = new JsonObject
+            //{
+            //    ["required"] = ""
+            //};
         }
         // 处理布尔字段类型
         else if (propertyType == typeof(BooleanFieldType))
@@ -471,23 +492,23 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
             else
             {
                 // 默认范围
-                schema["min"] = 1;
+                schema["min"] = 0;
                 schema["max"] = 100;
             }
 
-            schema["x-component-props"] = props;
+            schema["props"] = props;
 
             // 添加错误消息
-            schema["message"] = new JsonObject
-            {
-                ["min"] = ""
-            };
+            //schema["message"] = new JsonObject
+            //{
+            //    ["min"] = ""
+            //};
         }
         // 处理图片字段类型
         else if (propertyType == typeof(ImageFieldType))
         {
             schema["type"] = "string";
-            schema["widget"] = "imageUpload";
+            schema["widget"] = "imageInput";
             schema["x-component"] = "ImageUploader";
 
             // 处理默认值
@@ -496,9 +517,9 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
             var props = new JsonObject
             {
                 ["listType"] = "picture-card",
-                ["accept"] = "image/*"
+                //["accept"] = "image/*"
             };
-            schema["x-component-props"] = props;
+            schema["props"] = props;
             schema["props"] = props.DeepClone();
         }
         // 处理文件字段类型
@@ -516,12 +537,11 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 ["listType"] = "text",
                 ["multiple"] = false
             };
-            schema["x-component-props"] = props;
+            schema["props"] = props;
             schema["props"] = props.DeepClone();
         }
         // 处理数组字段类型
-        else if (propertyType == typeof(ArrayFieldType) ||
-                 (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(ArrayFieldType<>)))
+        else if (propertyType == typeof(ArrayFieldType))
         {
             schema["type"] = "array";
             schema["widget"] = "list";
@@ -593,7 +613,7 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
 
                 if (props.Count > 0)
                 {
-                    items["x-component-props"] = props;
+                    items["props"] = props;
                     items["props"] = props.DeepClone();
                 }
             }
@@ -611,7 +631,7 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 {
                     ["showTime"] = true
                 };
-                items["x-component-props"] = itemProps;
+                items["props"] = itemProps;
                 items["props"] = itemProps.DeepClone();
             }
             else
@@ -637,7 +657,7 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
 
                 if (props.Count > 0)
                 {
-                    items["x-component-props"] = props;
+                    items["props"] = props;
                     items["props"] = props.DeepClone();
                 }
             }
@@ -705,12 +725,13 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 ["options"] = options
             };
 
-            schema["x-component-props"] = new JsonObject
+            schema["props"] = new JsonObject
             {
                 ["options"] = options.DeepClone()
             };
         }
-        // 处理枚举多选字段类型
+
+        // 处理枚举多选
         else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(OptionsMultiFieldType<>))
         {
             schema["type"] = "array";
@@ -731,14 +752,6 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                         var enumValue = Convert.ToInt32(defaultValueAttr.Value);
                         schema["default"] = enumValue.ToString();
                         schema["defaultValue"] = enumValue.ToString();
-                    }
-                    else if (defaultValueAttr.Value.GetType().IsArray)
-                    {
-                        var enumValues = ((Array)defaultValueAttr.Value).Cast<object>()
-                            .Select(v => Convert.ToInt32(v).ToString())
-                            .ToArray();
-                        schema["default"] = string.Join(",", enumValues);
-                        schema["defaultValue"] = string.Join(",", enumValues);
                     }
                 }
                 catch
@@ -774,14 +787,12 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
 
             schema["props"] = new JsonObject
             {
-                ["options"] = options,
-                ["direction"] = "row"
+                ["options"] = options
             };
 
-            schema["x-component-props"] = new JsonObject
+            schema["props"] = new JsonObject
             {
-                ["options"] = options.DeepClone(),
-                ["direction"] = "row"
+                ["options"] = options.DeepClone()
             };
         }
 

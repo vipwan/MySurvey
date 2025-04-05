@@ -93,9 +93,10 @@ public class ContentSerializer
 
     public T DeserializeContent<T>(string json) where T : IContent, new()
     {
-        //{"Title":"耂656","Content":"543543","Description":"54534"}
-
+        //[{"fieldName":"Q","value":"5435435"},{"fieldName":"A","value":"Hello"},{"fieldName":"BackColor","value":"#431919"},{"fieldName":"IsTop","value":true},{"fieldName":"Category","value":"2"}]
         var content = new T();
+
+        // 反序列化JSON字符串为ContentFieldValue列表
         var fieldValues = JsonSerializer.Deserialize<List<ContentFieldValue>>(json, _options);
 
         if (fieldValues == null)
@@ -121,8 +122,63 @@ public class ContentSerializer
             // 设置字段值
             SetFieldValue(fieldTypeInstance, fieldValue.Value);
 
-            // 设置属性值
-            property.SetValue(content, fieldTypeInstance);
+
+            //property.PropertyType.Name
+            //"OptionsMultiFieldType`1"
+            //typeof(OptionsMultiFieldType<>).Name
+            //"OptionsMultiFieldType`1"
+
+
+            // 泛型则表示枚举,单选:
+            if (property.PropertyType.IsGenericType && property.PropertyType.Name == (typeof(OptionsFieldType<>).Name))
+            {
+                // 获取枚举类型
+                var enumType = property.PropertyType.GetGenericArguments()[0];
+                // 将字段值转换为枚举值
+                var enumValue = Enum.Parse(enumType, fieldValue.Value);
+                // 构造对应的泛型OptionsFieldType<>
+                var optionsFieldType = typeof(OptionsFieldType<>).MakeGenericType(enumType);
+                // 设置属性值
+                var optionsValue = Activator.CreateInstance(optionsFieldType);
+                //调用SetValue方法
+                var setValueMethod = optionsFieldType.GetMethod(nameof(IFieldType.SetValue));
+                setValueMethod?.Invoke(optionsValue, [enumValue]);
+                // 设置属性值
+                property.SetValue(content, optionsValue);
+            }
+            // 如果是多选项
+            else if (property.PropertyType.IsGenericType && property.PropertyType.Name == (typeof(OptionsMultiFieldType<>).Name))
+            {
+                // 获取枚举类型
+                var enumType = property.PropertyType.GetGenericArguments()[0];
+                //泛型多选项使用1,2,3逗号隔开,需要特殊处理:
+                var values = fieldValue.Value.Split(',').ToList();//不需要转换.存储字符串数组
+                // 构造对应的泛型OptionsFieldType<>
+                var optionsFieldType = typeof(OptionsMultiFieldType<>).MakeGenericType(enumType);
+                // 设置属性值
+                var optionsValue = Activator.CreateInstance(optionsFieldType);
+                //调用SetValue方法
+                var setValueMethod = optionsFieldType.GetMethod(nameof(IFieldType.SetValue));
+                setValueMethod?.Invoke(optionsValue, [values]);
+                // 设置属性值
+                property.SetValue(content, optionsValue);
+            }
+            else if (fieldTypeInstance is IFieldType field)
+            {
+                // 设置属性值
+                property.SetValue(content, field);
+            }
+
+            else if (fieldTypeInstance is ArrayFieldType arrayFieldType)
+            {
+                // 设置数组字段值
+                arrayFieldType.SetValue(fieldTypeInstance);
+            }
+            else
+            {
+                // 设置属性值
+                property.SetValue(content, fieldTypeInstance);
+            }
         }
 
         return content;
@@ -227,6 +283,8 @@ public class ContentSerializer
             return "number";
         else if (fieldType == typeof(DateTimeFieldType))
             return "datetime";
+        else if (fieldType == typeof(TimeFieldType))
+            return "timePicker";
         else if (fieldType == typeof(TextAreaFieldType))
             return "textArea";
         else if (fieldType == typeof(MarkdownFieldType))
@@ -236,24 +294,83 @@ public class ContentSerializer
         else if (fieldType == typeof(ColorFieldType))
             return "color";
         else if (fieldType == typeof(ImageFieldType))
-            return "image";
+            return "imageInput";
         else if (fieldType == typeof(FileFieldType))
             return "file";
         else if (fieldType == typeof(ArrayFieldType))
             return "array";
-        else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(ArrayFieldType<>))
-            return "array";
         else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(OptionsFieldType<>))
             return "enum";
         else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(OptionsMultiFieldType<>))
-            return "enumMulti";
+            return "checkboxes";
 
         return string.Empty;
     }
 }
 
-public class ContentFieldValue
+/// <summary>
+/// 转换类型定义
+/// </summary>
+internal class ContentFieldValue
 {
     public string FieldName { get; set; } = string.Empty;
+
+    [JsonConverter(typeof(JsonStringConverter))]
     public string Value { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 转换器,将不同类型转换为字符串
+/// </summary>
+internal class JsonStringConverter : JsonConverter<string>
+{
+    public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.True)
+        {
+            return "true";
+        }
+        else if (reader.TokenType == JsonTokenType.False)
+        {
+            return "false";
+        }
+        else if (reader.TokenType == JsonTokenType.Number)
+        {
+            if (reader.TryGetInt64(out long l))
+            {
+                return l.ToString();
+            }
+            else if (reader.TryGetDouble(out double d))
+            {
+                return d.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+        else if (reader.TokenType == JsonTokenType.Null)
+        {
+            return string.Empty;
+        }
+        // 处理数组类型
+        if (reader.TokenType == JsonTokenType.StartArray)
+        {
+            var array = new List<string>();
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndArray)
+                    break;
+                if (reader.TokenType == JsonTokenType.String)
+                {
+                    array.Add(reader.GetString() ?? string.Empty);
+                }
+            }
+            return string.Join(",", array);
+        }
+
+
+        return reader.GetString() ?? string.Empty;
+    }
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value);
+    }
 }

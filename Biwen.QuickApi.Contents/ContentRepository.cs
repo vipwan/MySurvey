@@ -172,6 +172,10 @@ public class ContentRepository<TDbContext> : IContentRepository where TDbContext
             throw new KeyNotFoundException($"Content with ID {id} not found");
         entity.Status = status;
         entity.UpdatedAt = DateTime.Now;
+
+        if (status == ContentStatus.Published)
+            entity.PublishedAt = DateTime.Now;
+
         await _dbContext.SaveChangesAsync();
     }
 

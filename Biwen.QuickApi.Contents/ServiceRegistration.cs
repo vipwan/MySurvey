@@ -39,12 +39,19 @@ public static class ServiceRegistration
         services.AddSingleton<IFieldType, TextAreaFieldType>();
         services.AddSingleton<IFieldType, MarkdownFieldType>();
         services.AddSingleton<IFieldType, NumberFieldType>();
+
+        services.AddSingleton<IFieldType, TimeFieldType>();
         services.AddSingleton<IFieldType, DateTimeFieldType>();
         services.AddSingleton<IFieldType, ImageFieldType>();
         services.AddSingleton<IFieldType, FileFieldType>();
+
+        //单选
+        services.AddSingleton<IFieldType, OptionsFieldType<int>>();//选项.默认枚举存储的类型为int
+        //复选
+        services.AddSingleton<IFieldType, OptionsMultiFieldType<int>>();//选项.默认枚举存储的类型为int
+
         // 注册ArrayFieldType
         services.AddSingleton<IFieldType, ArrayFieldType>();
-        //services.AddSingleton<IFieldType, ArrayFieldType<string>>();
 
         // 注册字段管理器
         services.AddSingleton<ContentFieldManager>();

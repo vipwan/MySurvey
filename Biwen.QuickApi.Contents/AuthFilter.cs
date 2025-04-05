@@ -9,6 +9,9 @@ using Microsoft.Extensions.Options;
 
 namespace Biwen.QuickApi.Contents;
 
+/// <summary>
+/// 鉴权筛选器
+/// </summary>
 internal class AuthFilter(IOptions<BiwenContentOptions> options) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)

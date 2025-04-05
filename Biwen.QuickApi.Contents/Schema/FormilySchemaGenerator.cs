@@ -425,8 +425,7 @@ public class FormilySchemaGenerator : IContentSchemaGenerator
             schema["x-component-props"] = props;
         }
         // 处理数组字段类型
-        else if (propertyType == typeof(ArrayFieldType) ||
-                 (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(ArrayFieldType<>)))
+        else if (propertyType == typeof(ArrayFieldType))
         {
             schema["type"] = "array";
             schema["x-component"] = "ArrayItems";
@@ -566,50 +565,6 @@ public class FormilySchemaGenerator : IContentSchemaGenerator
             schema["x-component-props"] = new JsonObject
             {
                 ["options"] = options
-            };
-        }
-
-        // 处理枚举多选字段类型
-        else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(OptionsMultiFieldType<>))
-        {
-            schema["type"] = "array";
-            schema["x-component"] = "Checkbox.Group";
-
-            // 获取枚举类型
-            var enumType = propertyType.GetGenericArguments()[0];
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(Array));
-
-            // 创建选项数组
-            var options = new JsonArray();
-            foreach (var enumValue in Enum.GetValues(enumType))
-            {
-                var name = enumValue.ToString();
-                var description = name;
-
-                // 获取描述特性
-                var fieldInfo = enumType.GetField(name!);
-                if (fieldInfo != null)
-                {
-                    var descAttr = fieldInfo.GetCustomAttribute<DescriptionAttribute>();
-                    if (descAttr != null && !string.IsNullOrEmpty(descAttr.Description))
-                    {
-                        description = descAttr.Description;
-                    }
-                }
-
-                options.Add(new JsonObject
-                {
-                    ["label"] = description,
-                    ["value"] = Convert.ToInt32(enumValue).ToString()
-                });
-            }
-
-            schema["x-component-props"] = new JsonObject
-            {
-                ["options"] = options,
-                ["direction"] = "row"
             };
         }
 

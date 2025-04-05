@@ -3,11 +3,9 @@
 // See the LICENSE file in the project root for more information.
 
 using Biwen.QuickApi.Attributes;
-using Biwen.QuickApi.Contents;
 using Biwen.QuickApi.Contents.Abstractions;
 using Biwen.QuickApi.Contents.Domain;
 using Biwen.QuickApi.UnitOfWork.Pagenation;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -46,7 +44,6 @@ public class PageRequest : BaseRequest<PageRequest>
 
 }
 
-//[Authorize]
 [QuickApi("/infopages", Group = Constants.GroupName)]
 [OpenApiMetadata("内容API", "文档查询")]
 public class ContentsApi(
@@ -204,8 +201,6 @@ public class UpdateContentApi(
         // 更新内容
         await (Task)updateMethod?.Invoke(repository, [contentId, updatedContent])!;
 
-        //await repository.UpdateContentAsync(contentId, updatedContent);
-
         // 更新状态
         var status = request.Status switch
         {
@@ -215,9 +210,7 @@ public class UpdateContentApi(
             _ => throw new ArgumentException("无效的状态值")
         };
 
-
-
-        //await repository.SetContentStatusAsync(contentId, status);
+        await repository.SetContentStatusAsync(contentId, status);
 
         return true;
     }
