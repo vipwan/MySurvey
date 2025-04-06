@@ -255,7 +255,56 @@ public class ContentSerializer
         if (string.IsNullOrEmpty(fieldSystemName))
             return null;
 
-        var fieldTypeInstance = _fieldManager.GetFieldType(fieldSystemName);
+        // 为每个属性创建新的实例，而不是重用FieldManager中的单例
+        IFieldType? fieldTypeInstance;
+
+        // 处理泛型类型
+        if (fieldType.IsGenericType)
+        {
+            // 获取泛型类型定义和参数
+            var genericTypeDefinition = fieldType.GetGenericTypeDefinition();
+            var genericArgs = fieldType.GetGenericArguments();
+
+            if (genericTypeDefinition == typeof(OptionsFieldType<>) ||
+                genericTypeDefinition == typeof(OptionsMultiFieldType<>))
+            {
+                // 创建具体的泛型实例
+                var concreteType = genericTypeDefinition.MakeGenericType(genericArgs);
+                try
+                {
+                    fieldTypeInstance = (IFieldType)Activator.CreateInstance(concreteType)!;
+                    return fieldTypeInstance;
+                }
+                catch
+                {
+                    // 创建失败，返回null让外部代码处理
+                    return null;
+                }
+            }
+            else
+            {
+                // 其他未识别的泛型类型
+                return null;
+            }
+        }
+        else
+        {
+            try
+            {
+                // 对于非泛型类型，直接使用具体类型创建实例
+                fieldTypeInstance = (IFieldType)Activator.CreateInstance(fieldType)!;
+            }
+            catch
+            {
+                // 如果直接创建失败，尝试从FieldManager获取原型再克隆
+                var prototype = _fieldManager.GetFieldType(fieldSystemName);
+                if (prototype == null)
+                    return null;
+
+                // 简单的深拷贝：创建同类型的新实例
+                fieldTypeInstance = (IFieldType)Activator.CreateInstance(prototype.GetType())!;
+            }
+        }
 
         // 如果是ArrayFieldType，确保初始化Value属性
         if (fieldTypeInstance is ArrayFieldType arrayFieldType && arrayFieldType.Value == null)
@@ -265,7 +314,6 @@ public class ContentSerializer
 
         return fieldTypeInstance;
     }
-
 
     // 获取字段类型系统名称
     private string GetFieldTypeSystemName(Type fieldType)
@@ -298,7 +346,7 @@ public class ContentSerializer
         else if (fieldType == typeof(FileFieldType))
             return "file";
         else if (fieldType == typeof(ArrayFieldType))
-            return "array";
+            return "tags";
         else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(OptionsFieldType<>))
             return "enum";
         else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(OptionsMultiFieldType<>))

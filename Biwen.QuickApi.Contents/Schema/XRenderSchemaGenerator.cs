@@ -16,15 +16,10 @@ namespace Biwen.QuickApi.Contents.Schema;
 /// <summary>
 /// XRender Schema生成服务，生成符合FormRender 2.0表单引擎规范的Schema
 /// </summary>
-public class XRenderSchemaGenerator : IContentSchemaGenerator
+public class XRenderSchemaGenerator(IMemoryCache memoryCache) : IContentSchemaGenerator
 {
-    private readonly IMemoryCache _memoryCache;
+    private readonly IMemoryCache _memoryCache = memoryCache;
     private const string CACHE_KEY_PREFIX = "XRenderSchema_";
-
-    public XRenderSchemaGenerator(IMemoryCache memoryCache)
-    {
-        _memoryCache = memoryCache;
-    }
 
     public virtual JsonObject GenerateSchema<T>() where T : IContent
     {
@@ -108,522 +103,415 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
     private JsonObject? GeneratePropertySchema(PropertyInfo property)
     {
         var propertyType = property.PropertyType;
-        var schema = new JsonObject();
 
-        // 设置标题
-        schema["title"] = property.Name;
-        schema["x-decorator"] = "FormItem";
+        // 如果不是字段类型，则返回null
+        if (!typeof(IFieldType).IsAssignableFrom(propertyType))
+            return null;
 
-        // 获取显示名称特性
-        var displayAttr = property.GetCustomAttribute<DisplayAttribute>();
-        // 获取DisplayName特性
-        var displayNameAttr = property.GetCustomAttribute<DisplayNameAttribute>();
+        // 创建基本schema对象
+        var schema = CreateBaseSchema(property);
 
-        if (displayAttr != null && !string.IsNullOrEmpty(displayAttr.Name))
+        // 根据字段类型处理特定配置
+        ProcessFieldTypeSpecificConfig(property, schema);
+
+        // 处理通用验证规则
+        ProcessCommonValidationRules(property, schema);
+
+        return schema;
+    }
+
+    private JsonObject CreateBaseSchema(PropertyInfo property)
+    {
+        var schema = new JsonObject
         {
-            schema["title"] = displayAttr.Name;
-        }
-        else if (displayNameAttr != null && !string.IsNullOrEmpty(displayNameAttr.DisplayName))
-        {
-            schema["title"] = displayNameAttr.DisplayName;
-        }
-        else
-        {
-            // 如果是枚举类型,使用DescriptionAttribute,如果没有使用名称
-            if (propertyType.IsEnum)
-            {
-                var enumName = propertyType.Name;
-                var enumField = propertyType.GetField(enumName);
-                if (enumField != null)
-                {
-                    var descAttr = enumField.GetCustomAttribute<DescriptionAttribute>();
-                    if (descAttr != null && !string.IsNullOrEmpty(descAttr.Description))
-                    {
-                        schema["title"] = descAttr.Description;
-                    }
-                }
-            }
-        }
+            // 设置基本标题
+            ["title"] = property.Name,
+            ["x-decorator"] = "FormItem"
+        };
 
-        // 获取描述特性
+        // 处理显示名称
+        SetDisplayName(property, schema);
+
+        // 处理描述
         var descriptionAttr = property.GetCustomAttribute<DescriptionAttribute>();
-        if (descriptionAttr != null && !string.IsNullOrEmpty(descriptionAttr.Description))
+        if (descriptionAttr is { Description: not null and not "" })
         {
             schema["description"] = descriptionAttr.Description;
         }
 
-        // 处理文本字段类型
-        if (propertyType == typeof(TextFieldType))
+        return schema;
+    }
+
+    private void SetDisplayName(PropertyInfo property, JsonObject schema)
+    {
+        var displayAttr = property.GetCustomAttribute<DisplayAttribute>();
+        var displayNameAttr = property.GetCustomAttribute<DisplayNameAttribute>();
+
+        switch (true)
         {
-            schema["type"] = "string";
-            schema["widget"] = "input";
-            schema["x-component"] = "Input";
+            case bool _ when displayAttr is { Name: not null and not "" }:
+                schema["title"] = displayAttr.Name;
+                break;
 
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
+            case bool _ when displayNameAttr is { DisplayName: not null and not "" }:
+                schema["title"] = displayNameAttr.DisplayName;
+                break;
 
-            var props = new JsonObject
-            {
-                ["placeholder"] = $"请输入{schema["title"]}"
-            };
+            case bool _ when property.PropertyType.IsEnum:
+                var enumName = property.PropertyType.Name;
+                var enumField = property.PropertyType.GetField(enumName);
+                if (enumField != null)
+                {
+                    var descAttr = enumField.GetCustomAttribute<DescriptionAttribute>();
+                    if (descAttr is { Description: not null and not "" })
+                    {
+                        schema["title"] = descAttr.Description;
+                    }
+                }
+                break;
+        }
+    }
 
+    private void ProcessFieldTypeSpecificConfig(PropertyInfo property, JsonObject schema)
+    {
+        var propertyType = property.PropertyType;
+
+        // 使用模式匹配处理不同字段类型
+        switch (propertyType)
+        {
+            case Type _ when propertyType == typeof(TextFieldType):
+                ConfigureTextField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(UrlFieldType):
+                ConfigureUrlField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(ColorFieldType):
+                ConfigureColorField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(TextAreaFieldType):
+                ConfigureTextAreaField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(MarkdownFieldType):
+                ConfigureMarkdownField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(DateTimeFieldType):
+                ConfigureDateTimeField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(TimeFieldType):
+                ConfigureTimeField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(IntegerFieldType):
+                ConfigureIntegerField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(BooleanFieldType):
+                ConfigureBooleanField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(NumberFieldType):
+                ConfigureNumberField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(ImageFieldType):
+                ConfigureImageField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(FileFieldType):
+                ConfigureFileField(property, schema);
+                break;
+
+            case Type _ when propertyType == typeof(ArrayFieldType):
+                ConfigureArrayField(property, schema);
+                break;
+
+            case Type _ when propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(OptionsFieldType<>):
+                ConfigureOptionsField(property, schema);
+                break;
+
+            case Type _ when propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(OptionsMultiFieldType<>):
+                ConfigureOptionsMultiField(property, schema);
+                break;
+        }
+    }
+
+    private void ConfigureTextField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "input";
+        schema["x-component"] = "Input";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+
+        var props = new JsonObject
+        {
+            ["placeholder"] = $"请输入{schema["title"]}"
+        };
+
+        schema["props"] = props;
+
+        // 处理字符串长度限制
+        ProcessStringLengthValidation(property, schema, props);
+
+        // 处理正则表达式验证
+        ProcessRegexValidation(property, schema);
+
+        // 处理数据类型验证
+        ProcessDataTypeValidation(property, schema, props);
+    }
+
+    private void ConfigureUrlField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["format"] = "url";
+        schema["widget"] = "input";
+        schema["x-component"] = "Input";
+        schema["x-validator"] = "url";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+
+        schema["props"] = new JsonObject
+        {
+            ["placeholder"] = "请输入URL"
+        };
+    }
+
+    private void ConfigureColorField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["format"] = "color";
+        schema["widget"] = "color";
+        schema["x-component"] = "ColorPicker";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+    }
+
+    private void ConfigureTextAreaField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "textArea";
+        schema["x-component"] = "TextArea";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+
+        var props = new JsonObject();
+        schema["props"] = props;
+
+        // 处理字符串长度限制
+        ProcessStringLengthValidation(property, schema, props);
+    }
+
+    private void ConfigureMarkdownField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "markdown";
+        schema["x-component"] = "Markdown";
+
+        // 处理Markdown工具栏样式
+        var markdownAttr = property.GetCustomAttribute<MarkdownToolBarAttribute>();
+        if (markdownAttr != null)
+        {
             schema["props"] = new JsonObject
             {
-                ["placeholder"] = $"请输入{schema["title"]}"
-            };
-
-            // 处理字符串长度限制
-            var stringLengthAttr = property.GetCustomAttribute<StringLengthAttribute>();
-            if (stringLengthAttr != null)
-            {
-                if (stringLengthAttr.MinimumLength > 0)
-                {
-                    schema["minLength"] = stringLengthAttr.MinimumLength;
-                    schema["min"] = stringLengthAttr.MinimumLength;
-                }
-                schema["maxLength"] = stringLengthAttr.MaximumLength;
-                schema["max"] = stringLengthAttr.MaximumLength;
-                props["maxLength"] = stringLengthAttr.MaximumLength;
-            }
-
-            // 处理最小长度限制
-            var minLengthAttr = property.GetCustomAttribute<MinLengthAttribute>();
-            if (minLengthAttr != null && stringLengthAttr == null)
-            {
-                schema["minLength"] = minLengthAttr.Length;
-                schema["min"] = minLengthAttr.Length;
-            }
-
-            // 处理正则表达式验证
-            var regexAttr = property.GetCustomAttribute<RegularExpressionAttribute>();
-            if (regexAttr != null)
-            {
-                schema["pattern"] = regexAttr.Pattern;
-                schema["x-validator"] = "pattern";
-
-                // 添加错误消息对象
-                if (schema["message"] == null)
-                {
-                    schema["message"] = new JsonObject();
-                }
-                if (!string.IsNullOrEmpty(regexAttr.ErrorMessage))
-                {
-                    ((JsonObject)schema["message"]!)["pattern"] = regexAttr.ErrorMessage;
-                }
-                else
-                {
-                    ((JsonObject)schema["message"]!)["pattern"] = "请输入正确的格式";
-                }
-            }
-
-            // 处理数据类型验证
-            var dataTypeAttr = property.GetCustomAttribute<DataTypeAttribute>();
-            if (dataTypeAttr != null)
-            {
-                switch (dataTypeAttr.DataType)
-                {
-                    case DataType.EmailAddress:
-                        schema["format"] = "email";
-                        schema["x-validator"] = "email";
-                        props["placeholder"] = "请输入邮箱地址";
-                        ((JsonObject)schema["props"]!)["placeholder"] = "请输入邮箱地址";
-                        break;
-                    case DataType.PhoneNumber:
-                        schema["format"] = "tel";
-                        schema["x-validator"] = "phone";
-                        props["placeholder"] = "请输入电话号码";
-                        ((JsonObject)schema["props"]!)["placeholder"] = "请输入电话号码";
-                        break;
-                    case DataType.Url:
-                        schema["format"] = "url";
-                        schema["x-validator"] = "url";
-                        props["placeholder"] = "请输入URL";
-                        ((JsonObject)schema["props"]!)["placeholder"] = "请输入URL";
-                        break;
-                    case DataType.Password:
-                        schema["widget"] = "password";
-                        schema["x-component"] = "Password";
-                        break;
-                    case DataType.MultilineText:
-                        schema["widget"] = "textarea";
-                        schema["x-component"] = "TextArea";
-                        break;
-                }
-            }
-
-            // 处理电子邮件特性
-            var emailAttr = property.GetCustomAttribute<EmailAddressAttribute>();
-            if (emailAttr != null)
-            {
-                schema["format"] = "email";
-                schema["x-validator"] = "email";
-                props["placeholder"] = "请输入邮箱地址";
-                ((JsonObject)schema["props"]!)["placeholder"] = "请输入邮箱地址";
-            }
-
-            // 处理电话号码特性
-            var phoneAttr = property.GetCustomAttribute<PhoneAttribute>();
-            if (phoneAttr != null)
-            {
-                schema["format"] = "tel";
-                schema["x-validator"] = "phone";
-                props["placeholder"] = "请输入电话号码";
-                ((JsonObject)schema["props"]!)["placeholder"] = "请输入电话号码";
-
-                // 添加错误消息
-                if (schema["message"] == null)
-                {
-                    schema["message"] = new JsonObject();
-                }
-                ((JsonObject)schema["message"]!)["pattern"] = "Invalid phone number format.";
-            }
-
-            // 添加组件属性
-            if (props.Count > 0)
-            {
-                schema["props"] = props;
-            }
-        }
-        // 处理URL字段类型
-        else if (propertyType == typeof(UrlFieldType))
-        {
-            schema["type"] = "string";
-            schema["format"] = "url";
-            schema["widget"] = "input";
-            schema["x-component"] = "Input";
-            schema["x-validator"] = "url";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
-
-            var props = new JsonObject
-            {
-                ["placeholder"] = "请输入URL"
-            };
-            schema["props"] = props;
-            schema["props"] = new JsonObject
-            {
-                ["placeholder"] = "请输入URL"
-            };
-        }
-        // 处理颜色字段类型
-        else if (propertyType == typeof(ColorFieldType))
-        {
-            schema["type"] = "string";
-            schema["format"] = "color";
-            schema["widget"] = "color";
-            schema["x-component"] = "ColorPicker";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
-        }
-        // 处理文本区域字段类型
-        else if (propertyType == typeof(TextAreaFieldType))
-        {
-            schema["type"] = "string";
-            schema["widget"] = "textArea";
-            schema["x-component"] = "TextArea";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
-
-            var props = new JsonObject();
-            schema["props"] = new JsonObject();
-
-            // 处理字符串长度限制
-            var stringLengthAttr = property.GetCustomAttribute<StringLengthAttribute>();
-            if (stringLengthAttr != null)
-            {
-                if (stringLengthAttr.MinimumLength > 0)
-                {
-                    schema["minLength"] = stringLengthAttr.MinimumLength;
-                    schema["min"] = stringLengthAttr.MinimumLength;
-                }
-                schema["maxLength"] = stringLengthAttr.MaximumLength;
-                schema["max"] = stringLengthAttr.MaximumLength;
-                props["maxLength"] = stringLengthAttr.MaximumLength;
-            }
-
-            // 处理最小长度限制
-            var minLengthAttr = property.GetCustomAttribute<MinLengthAttribute>();
-            if (minLengthAttr != null && stringLengthAttr == null)
-            {
-                schema["minLength"] = minLengthAttr.Length;
-                schema["min"] = minLengthAttr.Length;
-            }
-
-            // 添加组件属性
-            if (props.Count > 0)
-            {
-                schema["props"] = props;
-            }
-        }
-        // 处理Markdown字段类型
-        else if (propertyType == typeof(MarkdownFieldType))
-        {
-            schema["type"] = "string";
-            schema["widget"] = "markdown";
-            schema["x-component"] = "Markdown";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
-        }
-        // 处理日期时间字段类型
-        else if (propertyType == typeof(DateTimeFieldType))
-        {
-            schema["type"] = "string";
-            schema["widget"] = "datePicker";
-            schema["x-component"] = "DatePicker";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(DateTime));
-
-            //showTime根据DisplayFormatAttribute来判断,包含HH:mm则为true,否则false
-            var showTime = false;
-            var displayFormatAttr = property.GetCustomAttribute<DisplayFormatAttribute>();
-            if (displayFormatAttr != null && !string.IsNullOrEmpty(displayFormatAttr.DataFormatString))
-            {
-                // 判断是否包含HH:mm
-                showTime = displayFormatAttr.DataFormatString.Contains("HH:mm");
-            }
-
-            var props = new JsonObject
-            {
-                ["showTime"] = showTime
-            };
-
-            schema["props"] = props;
-            schema["props"] = new JsonObject
-            {
-                ["showTime"] = showTime
-            };
-        }
-        // 处理时间字段类型
-        else if (propertyType == typeof(TimeFieldType))
-        {
-            schema["type"] = "string";
-            schema["widget"] = "timePicker";
-            schema["x-component"] = "TimePicker";
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
-            schema["props"] = new JsonObject
-            {
-                ["format"] = "HH:mm:ss"
+                ["toolStyle"] = markdownAttr.ToolStyle.ToString()
             };
         }
 
-        // 处理整数字段类型
-        else if (propertyType == typeof(IntegerFieldType))
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+    }
+
+    private void ConfigureDateTimeField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "datePicker";
+        schema["x-component"] = "DatePicker";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(DateTime));
+
+        // showTime根据DisplayFormatAttribute来判断,包含HH:mm则为true,否则false
+        var showTime = false;
+        var displayFormatAttr = property.GetCustomAttribute<DisplayFormatAttribute>();
+        if (displayFormatAttr is { DataFormatString: not null and not "" })
         {
-            schema["type"] = "number";
-            schema["widget"] = "inputNumber";
-            schema["x-component"] = "NumberPicker";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(int));
-
-            var props = new JsonObject
-            {
-                ["precision"] = 0
-            };
-
-            // 处理Range特性
-            var rangeAttr = property.GetCustomAttribute<RangeAttribute>();
-            if (rangeAttr != null)
-            {
-                // 设置最小值和最大值 - FormRender 2.0 格式
-                schema["minimum"] = Convert.ToDouble(rangeAttr.Minimum);
-                schema["maximum"] = Convert.ToDouble(rangeAttr.Maximum);
-                schema["min"] = Convert.ToDouble(rangeAttr.Minimum);
-                schema["max"] = Convert.ToDouble(rangeAttr.Maximum);
-
-                // 组件属性中的min和max
-                props["min"] = Convert.ToDouble(rangeAttr.Minimum);
-                props["max"] = Convert.ToDouble(rangeAttr.Maximum);
-            }
-
-            schema["props"] = props;
-
-            // 添加错误消息
-            //schema["message"] = new JsonObject
-            //{
-            //    ["required"] = ""
-            //};
+            // 判断是否包含HH:mm
+            showTime = displayFormatAttr.DataFormatString.Contains("HH:mm");
         }
-        // 处理布尔字段类型
-        else if (propertyType == typeof(BooleanFieldType))
-        {
-            schema["type"] = "boolean";
-            schema["widget"] = "switch";
-            schema["x-component"] = "Switch";
 
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(bool));
+        schema["props"] = new JsonObject
+        {
+            ["showTime"] = showTime
+        };
+    }
+
+    private void ConfigureTimeField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "timePicker";
+        schema["x-component"] = "TimePicker";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+
+        schema["props"] = new JsonObject
+        {
+            ["format"] = "HH:mm:ss"
+        };
+    }
+
+    private void ConfigureIntegerField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "number";
+        schema["widget"] = "inputNumber";
+        schema["x-component"] = "NumberPicker";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(int));
+
+        var props = new JsonObject
+        {
+            ["precision"] = 0
+        };
+
+        // 处理Range特性
+        ProcessRangeValidation(property, schema, props);
+
+        schema["props"] = props;
+    }
+
+    private void ConfigureBooleanField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "boolean";
+        schema["widget"] = "switch";
+        schema["x-component"] = "Switch";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(bool));
+    }
+
+    private void ConfigureNumberField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "number";
+        schema["widget"] = "inputNumber";
+        schema["x-component"] = "NumberPicker";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(double));
+
+        var props = new JsonObject
+        {
+            ["precision"] = 2
+        };
+
+        // 处理Range特性
+        if (!ProcessRangeValidation(property, schema, props))
+        {
+            // 默认范围
+            schema["min"] = 0;
+            schema["max"] = 100;
         }
-        // 处理数字(浮点数)字段类型
-        else if (propertyType == typeof(NumberFieldType))
+
+        schema["props"] = props;
+    }
+
+    private void ConfigureImageField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "imageInput";
+        schema["x-component"] = "ImageUploader";
+
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+
+        var props = new JsonObject
         {
-            schema["type"] = "number";
-            schema["widget"] = "inputNumber";
-            schema["x-component"] = "NumberPicker";
+            ["listType"] = "picture-card"
+        };
+        schema["props"] = props.DeepClone();
+    }
 
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(double));
+    private void ConfigureFileField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "upload";
+        schema["x-component"] = "Upload";
 
-            var props = new JsonObject
+        // 处理默认值
+        ProcessDefaultValue(property, schema, typeof(string));
+
+        var props = new JsonObject
+        {
+            ["listType"] = "text",
+            ["multiple"] = false
+        };
+        schema["props"] = props.DeepClone();
+    }
+
+    private void ConfigureArrayField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "array";
+        schema["widget"] = "tags";
+        schema["x-component"] = "ArrayItems";
+
+        // 根据泛型参数确定数组项的类型
+        var itemType = typeof(string); // 默认为字符串类型
+        if (property.PropertyType.IsGenericType)
+        {
+            var genericArgs = property.PropertyType.GetGenericArguments();
+            if (genericArgs.Length > 0)
             {
-                ["precision"] = 2
-            };
-
-            // 处理Range特性
-            var rangeAttr = property.GetCustomAttribute<RangeAttribute>();
-            if (rangeAttr != null)
-            {
-                // 设置最小值和最大值 - FormRender 2.0 格式
-                schema["minimum"] = Convert.ToDouble(rangeAttr.Minimum);
-                schema["maximum"] = Convert.ToDouble(rangeAttr.Maximum);
-                schema["min"] = Convert.ToDouble(rangeAttr.Minimum);
-                schema["max"] = Convert.ToDouble(rangeAttr.Maximum);
-
-                // 组件属性中的min和max
-                props["min"] = Convert.ToDouble(rangeAttr.Minimum);
-                props["max"] = Convert.ToDouble(rangeAttr.Maximum);
+                itemType = genericArgs[0];
             }
-            else
-            {
-                // 默认范围
-                schema["min"] = 0;
-                schema["max"] = 100;
-            }
-
-            schema["props"] = props;
-
-            // 添加错误消息
-            //schema["message"] = new JsonObject
-            //{
-            //    ["min"] = ""
-            //};
         }
-        // 处理图片字段类型
-        else if (propertyType == typeof(ImageFieldType))
+
+        // 处理默认值
+        if (property.PropertyType.IsGenericType)
         {
-            schema["type"] = "string";
-            schema["widget"] = "imageInput";
-            schema["x-component"] = "ImageUploader";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
-
-            var props = new JsonObject
-            {
-                ["listType"] = "picture-card",
-                //["accept"] = "image/*"
-            };
-            schema["props"] = props;
-            schema["props"] = props.DeepClone();
+            // 使用数组类型作为预期类型
+            var arrayType = Array.CreateInstance(itemType, 0).GetType();
+            ProcessDefaultValue(property, schema, arrayType);
         }
-        // 处理文件字段类型
-        else if (propertyType == typeof(FileFieldType))
+        else
         {
-            schema["type"] = "string";
-            schema["widget"] = "upload";
-            schema["x-component"] = "Upload";
-
-            // 处理默认值
-            ProcessDefaultValue(property, schema, typeof(string));
-
-            var props = new JsonObject
-            {
-                ["listType"] = "text",
-                ["multiple"] = false
-            };
-            schema["props"] = props;
-            schema["props"] = props.DeepClone();
+            ProcessDefaultValue(property, schema, typeof(string[]));
         }
-        // 处理数组字段类型
-        else if (propertyType == typeof(ArrayFieldType))
+
+        // 配置数组项
+        ConfigureArrayItems(property, schema, itemType);
+    }
+
+    private void ConfigureArrayItems(PropertyInfo property, JsonObject schema, Type itemType)
+    {
+        var items = new JsonObject
         {
-            schema["type"] = "array";
-            schema["widget"] = "list";
-            schema["x-component"] = "ArrayItems";
+            ["type"] = GetJsonSchemaType(itemType)
+        };
 
-            // 根据泛型参数确定数组项的类型
-            var itemType = typeof(string); // 默认为字符串类型
-            if (propertyType.IsGenericType)
-            {
-                var genericArgs = propertyType.GetGenericArguments();
-                if (genericArgs.Length > 0)
-                {
-                    itemType = genericArgs[0];
-                }
-            }
+        switch (itemType)
+        {
+            case Type _ when itemType == typeof(int) || itemType == typeof(long) ||
+                           itemType == typeof(double) || itemType == typeof(float) ||
+                           itemType == typeof(decimal):
+                ConfigureNumberArrayItem(property, items, itemType);
+                break;
 
-            // 处理默认值
-            if (propertyType.IsGenericType)
-            {
-                // 使用数组类型作为预期类型
-                var arrayType = Array.CreateInstance(itemType, 0).GetType();
-                ProcessDefaultValue(property, schema, arrayType);
-            }
-            else
-            {
-                ProcessDefaultValue(property, schema, typeof(string[]));
-            }
-
-            // 根据数组项的类型设置组件
-            var items = new JsonObject
-            {
-                ["type"] = GetJsonSchemaType(itemType)
-            };
-
-            // 根据数组项类型选择合适的组件
-            if (itemType == typeof(int) || itemType == typeof(long) ||
-                itemType == typeof(double) || itemType == typeof(float) ||
-                itemType == typeof(decimal))
-            {
-                items["widget"] = "inputNumber";
-                items["x-component"] = "NumberPicker";
-
-                var props = new JsonObject();
-
-                // 处理Range特性
-                var rangeAttr = property.GetCustomAttribute<RangeAttribute>();
-                if (rangeAttr != null)
-                {
-                    // 设置最小值和最大值 - FormRender 2.0 格式
-                    items["minimum"] = Convert.ToDouble(rangeAttr.Minimum);
-                    items["maximum"] = Convert.ToDouble(rangeAttr.Maximum);
-                    items["min"] = Convert.ToDouble(rangeAttr.Minimum);
-                    items["max"] = Convert.ToDouble(rangeAttr.Maximum);
-
-                    // 组件属性中的min和max
-                    props["min"] = Convert.ToDouble(rangeAttr.Minimum);
-                    props["max"] = Convert.ToDouble(rangeAttr.Maximum);
-                }
-
-                // 对于整数类型设置precision为0
-                if (itemType == typeof(int) || itemType == typeof(long))
-                {
-                    props["precision"] = 0;
-                }
-                else
-                {
-                    props["precision"] = 2;
-                }
-
-                if (props.Count > 0)
-                {
-                    items["props"] = props;
-                    items["props"] = props.DeepClone();
-                }
-            }
-            else if (itemType == typeof(bool))
-            {
+            case Type _ when itemType == typeof(bool):
                 items["widget"] = "switch";
                 items["x-component"] = "Switch";
-            }
-            else if (itemType == typeof(DateTime))
-            {
+                break;
+
+            case Type _ when itemType == typeof(DateTime):
                 items["widget"] = "datePicker";
                 items["x-component"] = "DatePicker";
                 items["format"] = "date-time";
@@ -631,177 +519,200 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 {
                     ["showTime"] = true
                 };
-                items["props"] = itemProps;
                 items["props"] = itemProps.DeepClone();
-            }
-            else
-            {
-                items["widget"] = "input";
-                items["x-component"] = "Input";
+                break;
 
-                var props = new JsonObject();
-
-                // 处理字符串类型的额外验证
-                var stringLengthAttr = property.GetCustomAttribute<StringLengthAttribute>();
-                if (stringLengthAttr != null)
-                {
-                    if (stringLengthAttr.MinimumLength > 0)
-                    {
-                        items["minLength"] = stringLengthAttr.MinimumLength;
-                        items["min"] = stringLengthAttr.MinimumLength;
-                    }
-                    items["maxLength"] = stringLengthAttr.MaximumLength;
-                    items["max"] = stringLengthAttr.MaximumLength;
-                    props["maxLength"] = stringLengthAttr.MaximumLength;
-                }
-
-                if (props.Count > 0)
-                {
-                    items["props"] = props;
-                    items["props"] = props.DeepClone();
-                }
-            }
-
-            schema["items"] = items;
+            default:
+                ConfigureStringArrayItem(property, items);
+                break;
         }
 
-        // 在 GeneratePropertySchema 方法中添加处理 OptionsFieldType 和 OptionsMultiFieldType 的代码
-        // 处理枚举单选字段类型
-        else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(OptionsFieldType<>))
+        schema["items"] = items;
+    }
+
+    private void ConfigureNumberArrayItem(PropertyInfo property, JsonObject items, Type itemType)
+    {
+        items["widget"] = "inputNumber";
+        items["x-component"] = "NumberPicker";
+
+        var props = new JsonObject();
+
+        // 处理Range特性
+        var rangeAttr = property.GetCustomAttribute<RangeAttribute>();
+        if (rangeAttr != null)
         {
-            schema["type"] = "string";
-            schema["widget"] = "radio";
-            schema["x-component"] = "Radio.Group";
+            // 设置最小值和最大值
+            items["minimum"] = Convert.ToDouble(rangeAttr.Minimum);
+            items["maximum"] = Convert.ToDouble(rangeAttr.Maximum);
+            items["min"] = Convert.ToDouble(rangeAttr.Minimum);
+            items["max"] = Convert.ToDouble(rangeAttr.Maximum);
 
-            // 获取枚举类型
-            var enumType = propertyType.GetGenericArguments()[0];
-
-            // 处理默认值
-            var defaultValueAttr = property.GetCustomAttribute<DefaultValueAttribute>();
-            if (defaultValueAttr != null && defaultValueAttr.Value != null)
-            {
-                try
-                {
-                    if (defaultValueAttr.Value.GetType().IsEnum)
-                    {
-                        var enumValue = Convert.ToInt32(defaultValueAttr.Value);
-                        schema["default"] = enumValue.ToString();
-                        schema["defaultValue"] = enumValue.ToString();
-                    }
-                }
-                catch
-                {
-                    // 如果转换失败，忽略默认值
-                }
-            }
-
-            // 创建选项数组
-            var options = new JsonArray();
-            foreach (var enumValue in Enum.GetValues(enumType))
-            {
-                var name = enumValue.ToString();
-                var description = name;
-
-                // 获取描述特性
-                var fieldInfo = enumType.GetField(name!);
-                if (fieldInfo != null)
-                {
-                    var descAttr = fieldInfo.GetCustomAttribute<DescriptionAttribute>();
-                    if (descAttr != null && !string.IsNullOrEmpty(descAttr.Description))
-                    {
-                        description = descAttr.Description;
-                    }
-                }
-
-                options.Add(new JsonObject
-                {
-                    ["label"] = description,
-                    ["value"] = Convert.ToInt32(enumValue).ToString()
-                });
-            }
-
-            schema["props"] = new JsonObject
-            {
-                ["options"] = options
-            };
-
-            schema["props"] = new JsonObject
-            {
-                ["options"] = options.DeepClone()
-            };
+            props["min"] = Convert.ToDouble(rangeAttr.Minimum);
+            props["max"] = Convert.ToDouble(rangeAttr.Maximum);
         }
 
-        // 处理枚举多选
-        else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(OptionsMultiFieldType<>))
+        // 根据类型设置精度
+        props["precision"] = itemType == typeof(int) || itemType == typeof(long) ? 0 : 2;
+
+        if (props.Count > 0)
         {
-            schema["type"] = "array";
-            schema["widget"] = "checkboxes";
-            schema["x-component"] = "Checkbox.Group";
-
-            // 获取枚举类型
-            var enumType = propertyType.GetGenericArguments()[0];
-
-            // 处理默认值
-            var defaultValueAttr = property.GetCustomAttribute<DefaultValueAttribute>();
-            if (defaultValueAttr != null && defaultValueAttr.Value != null)
-            {
-                try
-                {
-                    if (defaultValueAttr.Value.GetType().IsEnum)
-                    {
-                        var enumValue = Convert.ToInt32(defaultValueAttr.Value);
-                        schema["default"] = enumValue.ToString();
-                        schema["defaultValue"] = enumValue.ToString();
-                    }
-                }
-                catch
-                {
-                    // 如果转换失败，忽略默认值
-                }
-            }
-
-            // 创建选项数组
-            var options = new JsonArray();
-            foreach (var enumValue in Enum.GetValues(enumType))
-            {
-                var name = enumValue.ToString();
-                var description = name;
-
-                // 获取描述特性
-                var fieldInfo = enumType.GetField(name!);
-                if (fieldInfo != null)
-                {
-                    var descAttr = fieldInfo.GetCustomAttribute<DescriptionAttribute>();
-                    if (descAttr != null && !string.IsNullOrEmpty(descAttr.Description))
-                    {
-                        description = descAttr.Description;
-                    }
-                }
-
-                options.Add(new JsonObject
-                {
-                    ["label"] = description,
-                    ["value"] = Convert.ToInt32(enumValue).ToString()
-                });
-            }
-
-            schema["props"] = new JsonObject
-            {
-                ["options"] = options
-            };
-
-            schema["props"] = new JsonObject
-            {
-                ["options"] = options.DeepClone()
-            };
+            items["props"] = props.DeepClone();
         }
+    }
 
-        else
+    private void ConfigureStringArrayItem(PropertyInfo property, JsonObject items)
+    {
+        items["widget"] = "input";
+        items["x-component"] = "Input";
+
+        var props = new JsonObject();
+
+        // 处理字符串长度限制
+        var stringLengthAttr = property.GetCustomAttribute<StringLengthAttribute>();
+        if (stringLengthAttr != null)
         {
-            return null;
+            if (stringLengthAttr.MinimumLength > 0)
+            {
+                items["minLength"] = stringLengthAttr.MinimumLength;
+                items["min"] = stringLengthAttr.MinimumLength;
+            }
+            items["maxLength"] = stringLengthAttr.MaximumLength;
+            items["max"] = stringLengthAttr.MaximumLength;
+            props["maxLength"] = stringLengthAttr.MaximumLength;
         }
 
-        // 处理必填属性 - 在FormRender 2.0中，同时使用required数组和字段属性
+        if (props.Count > 0)
+        {
+            items["props"] = props.DeepClone();
+        }
+    }
+
+    private void ConfigureOptionsField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "string";
+        schema["widget"] = "radio";
+        schema["x-component"] = "Radio.Group";
+
+        // 获取枚举类型
+        var enumType = property.PropertyType.GetGenericArguments()[0];
+
+        // 处理默认值
+        ProcessEnumDefaultValue(property, schema);
+
+        // 创建选项数组
+        var options = CreateEnumOptions(enumType);
+
+        schema["props"] = new JsonObject
+        {
+            ["options"] = options.DeepClone()
+        };
+    }
+
+    private void ConfigureOptionsMultiField(PropertyInfo property, JsonObject schema)
+    {
+        schema["type"] = "array";
+        schema["widget"] = "checkboxes";
+        schema["x-component"] = "Checkbox.Group";
+
+        // 获取枚举类型
+        var enumType = property.PropertyType.GetGenericArguments()[0];
+
+        // 处理默认值
+        ProcessEnumDefaultValue(property, schema);
+
+        // 创建选项数组
+        var options = CreateEnumOptions(enumType);
+
+        schema["props"] = new JsonObject
+        {
+            ["options"] = options.DeepClone()
+        };
+    }
+
+    private void ProcessEnumDefaultValue(PropertyInfo property, JsonObject schema)
+    {
+        var defaultValueAttr = property.GetCustomAttribute<DefaultValueAttribute>();
+        if (defaultValueAttr?.Value != null)
+        {
+            try
+            {
+                if (defaultValueAttr.Value.GetType().IsEnum)
+                {
+                    var enumValue = Convert.ToInt32(defaultValueAttr.Value);
+                    schema["default"] = enumValue.ToString();
+                    schema["defaultValue"] = enumValue.ToString();
+                }
+            }
+            catch
+            {
+                // 如果转换失败，忽略默认值
+            }
+        }
+    }
+
+    private JsonArray CreateEnumOptions(Type enumType)
+    {
+        var options = new JsonArray();
+
+        foreach (var enumValue in Enum.GetValues(enumType))
+        {
+            var name = enumValue.ToString();
+            var description = name;
+
+            // 获取字段信息及其特性
+            var fieldInfo = enumType.GetField(name!);
+            if (fieldInfo != null)
+            {
+                description = GetEnumValueDescription(fieldInfo) ?? name;
+            }
+
+            options.Add(new JsonObject
+            {
+                ["label"] = description,
+                ["value"] = Convert.ToInt32(enumValue).ToString()
+            });
+        }
+
+        return options;
+    }
+
+    private string? GetEnumValueDescription(FieldInfo fieldInfo)
+    {
+        // 优先使用Display特性
+        var displayAttr = fieldInfo.GetCustomAttribute<DisplayAttribute>();
+        if (displayAttr is { Name: not null and not "" })
+        {
+            return displayAttr.Name;
+        }
+
+        // 其次使用DisplayName特性
+        var displayNameAttr = fieldInfo.GetCustomAttribute<DisplayNameAttribute>();
+        if (displayNameAttr is { DisplayName: not null and not "" })
+        {
+            return displayNameAttr.DisplayName;
+        }
+
+        // 最后使用Description特性
+        var descAttr = fieldInfo.GetCustomAttribute<DescriptionAttribute>();
+        if (descAttr is { Description: not null and not "" })
+        {
+            return descAttr.Description;
+        }
+
+        return null;
+    }
+
+    private void ProcessCommonValidationRules(PropertyInfo property, JsonObject schema)
+    {
+        // 处理必填属性
+        ProcessRequiredValidation(property, schema);
+
+        // 处理比较验证
+        ProcessCompareValidation(property, schema);
+    }
+
+    private void ProcessRequiredValidation(PropertyInfo property, JsonObject schema)
+    {
         var requiredAttr = property.GetCustomAttribute<RequiredAttribute>();
         if (requiredAttr != null)
         {
@@ -817,8 +728,10 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 ((JsonObject)schema["message"]!)["required"] = requiredAttr.ErrorMessage;
             }
         }
+    }
 
-        // 处理比较验证（例如确认密码）
+    private void ProcessCompareValidation(PropertyInfo property, JsonObject schema)
+    {
         var compareAttr = property.GetCustomAttribute<CompareAttribute>();
         if (compareAttr != null)
         {
@@ -829,8 +742,143 @@ public class XRenderSchemaGenerator : IContentSchemaGenerator
                 ["depends"] = new JsonArray { compareAttr.OtherProperty }
             };
         }
+    }
 
-        return schema;
+    private void ProcessStringLengthValidation(PropertyInfo property, JsonObject schema, JsonObject props)
+    {
+        // 处理字符串长度限制
+        var stringLengthAttr = property.GetCustomAttribute<StringLengthAttribute>();
+        if (stringLengthAttr != null)
+        {
+            if (stringLengthAttr.MinimumLength > 0)
+            {
+                schema["minLength"] = stringLengthAttr.MinimumLength;
+                schema["min"] = stringLengthAttr.MinimumLength;
+            }
+            schema["maxLength"] = stringLengthAttr.MaximumLength;
+            schema["max"] = stringLengthAttr.MaximumLength;
+            props["maxLength"] = stringLengthAttr.MaximumLength;
+        }
+
+        // 处理最小长度限制
+        var minLengthAttr = property.GetCustomAttribute<MinLengthAttribute>();
+        if (minLengthAttr != null && stringLengthAttr == null)
+        {
+            schema["minLength"] = minLengthAttr.Length;
+            schema["min"] = minLengthAttr.Length;
+        }
+    }
+
+    private bool ProcessRangeValidation(PropertyInfo property, JsonObject schema, JsonObject props)
+    {
+        // 处理Range特性
+        var rangeAttr = property.GetCustomAttribute<RangeAttribute>();
+        if (rangeAttr != null)
+        {
+            // 设置最小值和最大值 - FormRender 2.0 格式
+            schema["minimum"] = Convert.ToDouble(rangeAttr.Minimum);
+            schema["maximum"] = Convert.ToDouble(rangeAttr.Maximum);
+            schema["min"] = Convert.ToDouble(rangeAttr.Minimum);
+            schema["max"] = Convert.ToDouble(rangeAttr.Maximum);
+
+            // 组件属性中的min和max
+            props["min"] = Convert.ToDouble(rangeAttr.Minimum);
+            props["max"] = Convert.ToDouble(rangeAttr.Maximum);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private void ProcessRegexValidation(PropertyInfo property, JsonObject schema)
+    {
+        // 处理正则表达式验证
+        var regexAttr = property.GetCustomAttribute<RegularExpressionAttribute>();
+        if (regexAttr != null)
+        {
+            schema["pattern"] = regexAttr.Pattern;
+            schema["x-validator"] = "pattern";
+
+            // 添加错误消息对象
+            if (schema["message"] == null)
+            {
+                schema["message"] = new JsonObject();
+            }
+            if (!string.IsNullOrEmpty(regexAttr.ErrorMessage))
+            {
+                ((JsonObject)schema["message"]!)["pattern"] = regexAttr.ErrorMessage;
+            }
+            else
+            {
+                ((JsonObject)schema["message"]!)["pattern"] = "请输入正确的格式";
+            }
+        }
+    }
+
+    private void ProcessDataTypeValidation(PropertyInfo property, JsonObject schema, JsonObject props)
+    {
+        // 处理数据类型验证
+        var dataTypeAttr = property.GetCustomAttribute<DataTypeAttribute>();
+        if (dataTypeAttr != null)
+        {
+            switch (dataTypeAttr.DataType)
+            {
+                case DataType.EmailAddress:
+                    schema["format"] = "email";
+                    schema["x-validator"] = "email";
+                    props["placeholder"] = "请输入邮箱地址";
+                    ((JsonObject)schema["props"]!)["placeholder"] = "请输入邮箱地址";
+                    break;
+                case DataType.PhoneNumber:
+                    schema["format"] = "tel";
+                    schema["x-validator"] = "phone";
+                    props["placeholder"] = "请输入电话号码";
+                    ((JsonObject)schema["props"]!)["placeholder"] = "请输入电话号码";
+                    break;
+                case DataType.Url:
+                    schema["format"] = "url";
+                    schema["x-validator"] = "url";
+                    props["placeholder"] = "请输入URL";
+                    ((JsonObject)schema["props"]!)["placeholder"] = "请输入URL";
+                    break;
+                case DataType.Password:
+                    schema["widget"] = "password";
+                    schema["x-component"] = "Password";
+                    break;
+                case DataType.MultilineText:
+                    schema["widget"] = "textarea";
+                    schema["x-component"] = "TextArea";
+                    break;
+            }
+        }
+
+        // 处理电子邮件特性
+        var emailAttr = property.GetCustomAttribute<EmailAddressAttribute>();
+        if (emailAttr != null)
+        {
+            schema["format"] = "email";
+            schema["x-validator"] = "email";
+            props["placeholder"] = "请输入邮箱地址";
+            ((JsonObject)schema["props"]!)["placeholder"] = "请输入邮箱地址";
+        }
+
+        // 处理电话号码特性
+        var phoneAttr = property.GetCustomAttribute<PhoneAttribute>();
+        if (phoneAttr != null)
+        {
+            schema["format"] = "tel";
+            schema["x-validator"] = "phone";
+            props["placeholder"] = "请输入电话号码";
+            ((JsonObject)schema["props"]!)["placeholder"] = "请输入电话号码";
+
+            // 添加错误消息
+            if (schema["message"] == null)
+            {
+                schema["message"] = new JsonObject();
+            }
+            ((JsonObject)schema["message"]!)["pattern"] = "Invalid phone number format.";
+        }
     }
 
     // 辅助方法：根据.NET类型获取JSON Schema的类型

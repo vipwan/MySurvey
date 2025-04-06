@@ -1,4 +1,13 @@
-﻿import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
+﻿/*
+ * @Author: 万雅虎
+ * @Date: 2025-04-06 16:24:37
+ * @LastEditTime: 2025-04-06 17:55:19
+ * @LastEditors: 万雅虎
+ * @Description: 
+ * @FilePath: \MySurvey\mysurvey.client\src\components\contents\InfoPage.jsx
+ * vipwan@sina.com © 万雅虎
+ */
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import {
     Button,
@@ -36,8 +45,9 @@ import api from '../../services/api'; // 导入已配置好的axios实例
 import Quill from 'quill'; // 导入 Quill 库
 import 'quill/dist/quill.snow.css'; // 导入 Quill 样式
 
+import TagsWidget from './widgets/TagsWidget';// 自定义标签组件
+
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 const { useToken } = theme;
 
 // 自定义 Markdown 编辑器组件
@@ -46,6 +56,42 @@ const MarkdownWidget = React.memo(({ onChange, value, schema }) => {
     const quillInstanceRef = useRef(null);
     const [content, setContent] = useState(value || '');
     const editorId = useMemo(() => `quill-editor-${schema?.name || 'default'}`, [schema?.name]);
+
+    // 定义工具栏配置
+    const TOOLBAR_CONFIGS = {
+        Full: [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'script': 'sub' }, { 'script': 'super' }],
+            [{ 'indent': '-1' }, { 'indent': '+1' }],
+            [{ 'direction': 'rtl' }],
+            [{ 'size': ['small', false, 'large', 'huge'] }],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'font': [] }],
+            [{ 'align': [] }],
+            ['clean'],
+            ['link', 'image', 'video']
+        ],
+        Standard: [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ 'header': [1, 2, 3, false] }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'align': [] }],
+            ['clean'],
+            ['link', 'image']
+        ],
+        Simple: [
+            ['bold', 'italic', 'underline'],
+            [{ 'header': [1, 2, false] }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            ['clean'],
+            ['link']
+        ]
+    };
 
     // 清理Quill实例
     const cleanupQuillInstance = useCallback(() => {
@@ -68,25 +114,14 @@ const MarkdownWidget = React.memo(({ onChange, value, schema }) => {
         if (quillInstanceRef.current || !editorRef.current) return;
 
         try {
+            // 获取工具栏样式配置
+            const toolStyle = schema?.props?.toolStyle || 'Standard';
+            const toolbar = TOOLBAR_CONFIGS[toolStyle] || TOOLBAR_CONFIGS.Standard;
+
             const quill = new Quill(editorRef.current, {
                 theme: 'snow',
                 modules: {
-                    toolbar: [
-                        ['bold', 'italic', 'underline', 'strike'],
-                        ['blockquote', 'code-block'],
-                        [{ 'header': 1 }, { 'header': 2 }],
-                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                        [{ 'script': 'sub' }, { 'script': 'super' }],
-                        [{ 'indent': '-1' }, { 'indent': '+1' }],
-                        [{ 'direction': 'rtl' }],
-                        [{ 'size': ['small', false, 'large', 'huge'] }],
-                        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-                        [{ 'color': [] }, { 'background': [] }],
-                        [{ 'font': [] }],
-                        [{ 'align': [] }],
-                        ['clean'],
-                        ['link', 'image']
-                    ]
+                    toolbar: toolbar
                 },
                 placeholder: schema?.props?.placeholder || '请输入内容...',
             });
@@ -111,7 +146,7 @@ const MarkdownWidget = React.memo(({ onChange, value, schema }) => {
         } catch (error) {
             console.error('初始化Quill编辑器失败:', error);
         }
-    }, [value, content, onChange, schema?.props?.placeholder]);
+    }, [value, content, onChange, schema?.props?.placeholder, schema?.props?.toolStyle]);
 
     // 组件挂载和卸载
     useEffect(() => {
@@ -141,7 +176,7 @@ const MarkdownWidget = React.memo(({ onChange, value, schema }) => {
         <div style={{ marginBottom: 16 }}>
             <div
                 ref={editorRef}
-                style={{ minHeight: 200 }}
+                style={{ minHeight: 200, minWidth: 670 }}
                 className="quill-editor-container"
             />
         </div>
@@ -245,25 +280,32 @@ const InfoPage = () => {
         }
     }, [schemaLoading]);
 
-    // 获取所有文档类型
+    // 获取所有文档类型并设置第一个为查询条件
     useEffect(() => {
         const fetchContentTypes = async () => {
             try {
                 const response = await contentApi.getAllContentType();
                 console.log('获取到的文档类型:', response.data);
-                if (Array.isArray(response.data)) {
+                if (Array.isArray(response.data) && response.data.length > 0) {
                     setContentTypes(response.data);
+
                     // 如果是新增模式且没有选择文档类型，设置第一个类型为默认值
-                    if (!editingRecord && response.data.length > 0) {
+                    if (!editingRecord) {
                         const defaultType = response.data[0].contentType;
                         setSelectedContentType(defaultType);
                         setBasicFormData(prev => ({
                             ...prev,
                             contentType: defaultType
                         }));
+
+                        // 设置第一个文档类型为查询条件，避免空列表
+                        setSearchParams(prev => ({
+                            ...prev,
+                            ContentType: defaultType
+                        }));
                     }
                 } else {
-                    message.error('获取文档类型数据格式错误');
+                    message.error('获取文档类型数据格式错误或为空');
                 }
             } catch (error) {
                 console.error('获取文档类型失败:', error);
@@ -272,6 +314,7 @@ const InfoPage = () => {
         };
         fetchContentTypes();
     }, [editingRecord]);
+
 
     // 监听文档类型变化
     const handleContentTypeChange = useCallback((value) => {
@@ -769,6 +812,7 @@ const InfoPage = () => {
     // 自定义组件映射，为 FormRender 提供 markdown 编辑器组件
     const widgets = {
         markdown: MarkdownWidget,
+        tags: TagsWidget,
     };
 
     // 修改基础表单的Card部分

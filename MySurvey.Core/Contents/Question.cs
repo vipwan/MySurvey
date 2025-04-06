@@ -24,7 +24,13 @@ public class Question : ContentBase<Question>
 
     [Display(Name = "答案")]
     [Required]
-    public MarkdownFieldType? A { get; set; } = null!;
+    [MarkdownToolBar(MarkdownToolStyle.Standard)]
+    public MarkdownFieldType? A { get; set; }
+
+    [DisplayName("答案2")]
+    [MarkdownToolBar(MarkdownToolStyle.Simple)]
+    public MarkdownFieldType? B { get; set; }
+
 
     [Description("背景色")]
     public ColorFieldType? BackColor { get; set; }
@@ -45,8 +51,8 @@ public class Question : ContentBase<Question>
     [DisplayName("创建时间")]
     public DateTimeFieldType? CreatedAt { get; set; } = null!;
 
-    [DisplayName("数字")]
-    public NumberFieldType? Number { get; set; } = null!;
+    //[DisplayName("数字")]
+    //public NumberFieldType? Number { get; set; } = null!;
 
     [DisplayName("整数")]
     public IntegerFieldType? Integer { get; set; }
@@ -75,6 +81,6 @@ public enum QuestionType
     Image = 4,
     [Description("视频")]
     Video = 5,
-    [Description("音频")]
+    [Display(Name = "音频1")]
     Audio = 6,
 }

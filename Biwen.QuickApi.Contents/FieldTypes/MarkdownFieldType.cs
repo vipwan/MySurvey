@@ -49,3 +49,52 @@ public class MarkdownFieldType : IFieldType
     /// <returns>验证错误消息</returns>
     public string? GetValidationErrorMessage() => null;
 }
+
+
+
+/// <summary>
+/// 标记Markdown工具栏样式的属性,包含简单,完整,自定义三种样式
+/// </summary>
+/// <remarks>
+/// 构造函数
+/// </remarks>
+/// <param name="toolStyle">工具栏样式</param>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = false, AllowMultiple = false)]
+public class MarkdownToolBarAttribute(MarkdownToolStyle toolStyle = MarkdownToolStyle.Standard) : Attribute
+{
+    /// <summary>
+    /// 工具栏样式
+    /// </summary>
+    public MarkdownToolStyle ToolStyle { get; set; } = toolStyle;
+
+    /// <summary>
+    /// 自定义样式
+    /// </summary>
+    public string CustomToolStyle { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// markdown 工具栏样式枚举
+/// </summary>
+public enum MarkdownToolStyle
+{
+    /// <summary>
+    /// 简单样式
+    /// </summary>
+    Simple,
+
+    /// <summary>
+    /// 标准样式
+    /// </summary>
+    Standard,
+
+
+    /// <summary>
+    /// 完整样式
+    /// </summary>
+    Full,
+    /// <summary>
+    /// 自定义样式
+    /// </summary>
+    Custom
+}

@@ -17,6 +17,7 @@ public class InfoPage : ContentBase<InfoPage>
     public TextFieldType Title { get; set; } = null!;
 
     [Display(Name = "内容")]
+    [MarkdownToolBar(MarkdownToolStyle.Full)]
     public MarkdownFieldType Content { get; set; } = null!;
 
     [Display(Name = "描述")]

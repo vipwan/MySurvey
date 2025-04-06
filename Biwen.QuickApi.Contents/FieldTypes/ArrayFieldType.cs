@@ -9,13 +9,16 @@ using Biwen.QuickApi.Contents.Abstractions;
 namespace Biwen.QuickApi.Contents.FieldTypes;
 
 /// <summary>
-/// 数组字段实现（字符串数组）
+/// 数组字段实现（字符串数组）使用tag
 /// </summary>
 public class ArrayFieldType : IFieldType
 {
     public string Name => "字符串数组";
-    public string SystemName => "array";
+    public string SystemName => "tags";
     public Type ValueType => typeof(string[]);
+
+
+    const string SplitString = "(^!@#$|)";
 
     public object? ConvertValue(string value)
     {
@@ -24,7 +27,7 @@ public class ArrayFieldType : IFieldType
             return Array.Empty<string>();
         }
 
-        return value.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        return value.Split(SplitString, StringSplitOptions.RemoveEmptyEntries);
     }
 
     public string ConvertToString(object? value)
@@ -36,7 +39,7 @@ public class ArrayFieldType : IFieldType
 
         if (value is string[] array)
         {
-            return string.Join(",", array);
+            return string.Join(SplitString, array);
         }
 
         return value.ToString() ?? string.Empty;
