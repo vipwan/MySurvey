@@ -94,17 +94,19 @@ public interface IContentRepository
     /// <typeparam name="T">内容类型</typeparam>
     /// <returns>Schema JSON</returns>
     string GetContentSchema<T>() where T : IContent;
-    
+
     /// <summary>
     /// 获取原始内容实体
     /// </summary>
     /// <param name="id">内容ID</param>
     /// <returns>内容实体</returns>
     Task<Content> GetRawContentAsync(Guid id);
-    
+
     /// <summary>
     /// 更新原始内容实体
     /// </summary>
     /// <param name="content">内容实体</param>
-    Task UpdateRawContentAsync(Content content);
+    /// <param name="isRollback">是否回滚</param>
+    /// <param name="version">版本</param>
+    Task UpdateRawContentAsync(Content content, bool isRollback = false, int version = 0);
 }

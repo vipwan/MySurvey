@@ -45,11 +45,23 @@ public class ContentAuditLogEventHandler(
         {
             var operatorId = httpContextAccessor.HttpContext?.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-            await contentAuditLogService.LogAuditAsync(
-                @event.Content.Id,
-                "更新内容",
-                $"标题: {@event.Content.Title}, 类型: {@event.Content.ContentType}",
-                operatorId);
+            if (@event.IsRollback)
+            {
+                await contentAuditLogService.LogAuditAsync(
+                    @event.Content.Id,
+                    "回滚内容",
+                    $"标题: {@event.Content.Title}, 类型: {@event.Content.ContentType}, 版本: {@event.RollbackVersion}",
+                    operatorId);
+                return;
+            }
+            else
+            {
+                await contentAuditLogService.LogAuditAsync(
+                    @event.Content.Id,
+                    "更新内容",
+                    $"标题: {@event.Content.Title}, 类型: {@event.Content.ContentType}",
+                    operatorId);
+            }
         }
         catch (Exception ex)
         {

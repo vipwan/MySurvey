@@ -1,7 +1,7 @@
 ﻿/*
  * @Author: 万雅虎
  * @Date: 2025-04-06 16:24:37
- * @LastEditTime: 2025-04-06 17:55:19
+ * @LastEditTime: 2025-04-07 00:46:28
  * @LastEditors: 万雅虎
  * @Description: 
  * @FilePath: \MySurvey\mysurvey.client\src\components\contents\InfoPage.jsx
@@ -49,6 +49,7 @@ import 'quill/dist/quill.snow.css'; // 导入 Quill 样式
 import TagsWidget from './widgets/TagsWidget';// 自定义标签组件
 
 import AuditLog from './AuditLog'; // 导入审计日志组件
+import { VersionHistoryModal } from './VersionHistory';
 
 // 审计日志模态框组件
 const AuditLogModal = ({ contentId, api, visible, onClose }) => {
@@ -68,7 +69,6 @@ const AuditLogModal = ({ contentId, api, visible, onClose }) => {
         </Modal>
     );
 };
-
 const { Title, Text } = Typography;
 const { useToken } = theme;
 
@@ -204,20 +204,25 @@ const MarkdownWidget = React.memo(({ onChange, value, schema }) => {
         </div>
     );
 });
-
 // 添加内容页面接口
 export const contentApi = {
-    getInfoPages: (params) => api.get('/api/contents/infopages', { params }),
-    createInfoPage: (data) => api.post('/api/contents/infopages/create', data),
-    updateInfoPage: (id, data) => api.put(`/api/contents/infopages/${id}`, data),
-    deleteInfoPage: (id) => api.delete(`/api/contents/infopages/${id}`),
+    getInfoPages: (params) => {
+        const random = Math.random();
+        return api.get('/api/contents/infopages', { params: { ...params, random } });
+    },
+    createInfoPage: (data) => api.post('/api/contents/create', data),
+    updateInfoPage: (id, data) => api.put(`/api/contents/${id}`, data),
+    deleteInfoPage: (id) => api.delete(`/api/contents/${id}`),
     getAllContentType: () => api.get('/api/contents/alltypes'),
     getInfoPageSchema: (type) => api.get(`/api/contents/schema/${type}`),
     // 审计日志 API
-    getAuditLogs: (id) => api.get(`/api/contents/infopages/${id}/auditlogs`),
-    getAuditLogsByDateRange: (params) => api.get('/api/contents/infopages/auditlogs', { params }),
+    getAuditLogs: (id) => api.get(`/api/contents/${id}/auditlogs`),
+    getAuditLogsByDateRange: (params) => api.get('/api/contents/auditlogs', { params }),
     // 版本控制 API
-    getVersions: (id) => api.get(`/api/contents/versions/${id}`),
+    getVersions: (id) => {
+        const random = Math.random();
+        return api.get(`/api/contents/versions/${id}`, { params: { random } });
+    },
     getVersion: (id, versionId) => api.get(`/api/contents/versions/${id}/${versionId}`),
     rollbackToVersion: (id, versionId) => api.post(`/api/contents/versions/${id}/rollback/${versionId}`)
 };
@@ -249,10 +254,26 @@ const InfoPage = () => {
     const [auditLogVisible, setAuditLogVisible] = useState(false);
     const [currentRecordId, setCurrentRecordId] = useState(null);
 
+    // 添加版本历史相关状态
+    const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
+
     // 添加显示审计日志的方法
     const showAuditLog = (record) => {
         setCurrentRecordId(record.id);
         setAuditLogVisible(true);
+    };
+
+    // 添加显示版本历史的方法
+    const showVersionHistory = (record) => {
+        setCurrentRecordId(record.id);
+        setVersionHistoryVisible(true);
+    };
+
+    // 处理版本回滚后的刷新
+    const handleVersionRollback = () => {
+        actionRef.current?.reload();
+        // 关闭版本历史模态框
+        setVersionHistoryVisible(false);
     };
 
     // 表格引用
@@ -810,6 +831,15 @@ const InfoPage = () => {
                         />
                     </Tooltip>
 
+                    {/* 版本历史按钮 */}
+                    <Tooltip title="版本历史">
+                        <Button
+                            type="text"
+                            icon={<FileTextOutlined />}
+                            onClick={() => showVersionHistory(record)}
+                        />
+                    </Tooltip>
+
                     {/* 快速复制按钮 */}
                     <Tooltip title="快速复制">
                         <Button
@@ -1151,6 +1181,15 @@ const InfoPage = () => {
                 api={contentApi}
                 visible={auditLogVisible}
                 onClose={() => setAuditLogVisible(false)}
+            />
+
+            {/* 版本历史模态框 */}
+            <VersionHistoryModal
+                contentId={currentRecordId}
+                api={contentApi}
+                visible={versionHistoryVisible}
+                onClose={() => setVersionHistoryVisible(false)}
+                onVersionRollback={handleVersionRollback}
             />
 
         </div>

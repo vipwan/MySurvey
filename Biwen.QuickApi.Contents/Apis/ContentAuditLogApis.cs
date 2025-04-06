@@ -7,17 +7,14 @@ using Biwen.QuickApi.Attributes;
 using Biwen.QuickApi.Contents.Domain;
 using Biwen.QuickApi.Contents.Services;
 using Biwen.QuickApi.UnitOfWork.Pagenation;
-using MapsterMapper;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace Biwen.QuickApi.Contents.Apis;
 
 /// <summary>
 /// 获取内容审计日志的API
 /// </summary>
-[QuickApi("/infopages/{id:guid}/auditlogs", Group = Constants.GroupName)]
+[QuickApi("/{id:guid}/auditlogs", Group = Constants.GroupName)]
 [OpenApiMetadata("获取内容审计日志", "获取指定内容的所有审计日志")]
 public class GetContentAuditLogsApi(
     IContentAuditLogService auditLogService, IHttpContextAccessor httpContextAccessor) : BaseQuickApi<EmptyRequest, IEnumerable<ContentAuditLogDto>>
@@ -80,7 +77,7 @@ public partial record ContentAuditLogDto;
 /// <summary>
 /// 时间范围内的审计日志查询API
 /// </summary>
-[QuickApi("/infopages/auditlogs", Group = Constants.GroupName)]
+[QuickApi("/auditlogs", Group = Constants.GroupName)]
 [OpenApiMetadata("查询审计日志", "按时间范围查询审计日志")]
 public class QueryAuditLogsApi(IContentAuditLogService auditLogService) : BaseQuickApi<AuditLogQueryRequest, IPagedList<ContentAuditLogDto>>
 {

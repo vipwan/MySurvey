@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Table, Typography, Badge, Spin, Empty, Tooltip, Timeline, Card, Divider } from 'antd';
-import { ClockCircleOutlined, EditOutlined, DeleteOutlined, PlusOutlined, EyeOutlined, UserOutlined } from '@ant-design/icons';
+import { LoadingOutlined, ClockCircleOutlined, EditOutlined, DeleteOutlined, PlusOutlined, EyeOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -18,7 +18,7 @@ const actionIconMap = {
     '更新内容': { icon: <EditOutlined />, color: 'blue' },
     '删除内容': { icon: <DeleteOutlined />, color: 'red' },
     '状态变更': { icon: <EyeOutlined />, color: 'purple' },
-    'View': { icon: <EyeOutlined />, color: 'cyan' },
+    '回滚内容': { icon: <EyeOutlined />, color: 'cyan' },
     'Default': { icon: <ClockCircleOutlined />, color: 'grey' }
 };
 
@@ -103,33 +103,32 @@ const AuditLog = ({ contentId, api }) => {
             return <Empty description="暂无审计日志" />;
         }
 
-        return (
-            <Timeline mode="left">
-                {auditLogs.map((log) => {
-                    const { icon, color } = getActionIcon(log.action);
-                    return (
-                        <Timeline.Item
-                            key={log.id}
-                            dot={icon}
-                            color={color}
-                            label={formatDateTime(log.timestamp)}
-                        >
-                            <div style={{ marginBottom: 8 }}>
-                                <Text strong>{log.action}</Text>
-                                {log.operatorId && (
-                                    <Tooltip title="操作者">
-                                        <Text type="secondary" style={{ marginLeft: 8 }}>
-                                            <UserOutlined /> {log.operatorName}
-                                        </Text>
-                                    </Tooltip>
-                                )}
-                            </div>
-                            <Text>{log.details}</Text>
-                        </Timeline.Item>
-                    );
-                })}
-            </Timeline>
-        );
+        // 构建 Timeline items 配置
+        const timelineItems = auditLogs.map((log) => {
+            const { icon, color } = getActionIcon(log.action);
+            return {
+                key: log.id,
+                dot: icon,
+                color: color,
+                label: formatDateTime(log.timestamp),
+                children: (
+                    <>
+                        <div style={{ marginBottom: 8 }}>
+                            <Text strong>{log.action}</Text>
+                            {log.operatorId && (
+                                <Tooltip title="操作者">
+                                    <Text type="secondary" style={{ marginLeft: 8 }}>
+                                        <UserOutlined /> {log.operatorName}
+                                    </Text>
+                                </Tooltip>
+                            )}
+                        </div>
+                        <Text>{log.details}</Text>
+                    </>
+                )
+            };
+        });
+        return <Timeline mode="left" items={timelineItems} />;
     };
 
     return (
@@ -144,7 +143,12 @@ const AuditLog = ({ contentId, api }) => {
         >
             {loading ? (
                 <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                    <Spin tip="加载审计日志中..." />
+                    <Spin indicator={
+                        <div>
+                            <div><LoadingOutlined style={{ fontSize: 24 }} spin /></div>
+                            <div style={{ marginTop: 8 }}>加载审计日志中...</div>
+                        </div>
+                    } />
                 </div>
             ) : error ? (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: '#ff4d4f' }}>

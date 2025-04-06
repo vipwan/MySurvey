@@ -204,30 +204,30 @@ public class ContentRepository(
         var entity = await dbContext.Contents.FindAsync(id);
         if (entity == null)
             throw new KeyNotFoundException($"未找到ID为 {id} 的内容");
-        
+
         return entity;
     }
-    
+
     /// <summary>
     /// 更新原始内容实体
     /// </summary>
     /// <param name="content">内容实体</param>
-    public async Task UpdateRawContentAsync(Content content)
+    public async Task UpdateRawContentAsync(Content content, bool isRollback = false, int version = 0)
     {
         // 保存旧版本的内容以用于事件发布
         var previousVersion = content.JsonContent;
-        
+
         // 只更新必要的字段
         content.UpdatedAt = DateTime.Now;
-        
+
         // 标记实体为已修改
         dbContext.Context.Entry(content).State = EntityState.Modified;
         await dbContext.Context.SaveChangesAsync();
-        
+
         // 发布内容更新事件
-        await new ContentUpdatedEvent(content, previousVersion).PublishAsync();
+        await new ContentUpdatedEvent(content, previousVersion, isRollback, version).PublishAsync();
     }
-    
+
     // 获取内容的Schema
     public string GetContentSchema<T>() where T : IContent
     {

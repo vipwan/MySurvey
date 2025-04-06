@@ -33,9 +33,9 @@ public interface IContentVersionService
     /// 获取指定内容的指定版本
     /// </summary>
     /// <param name="contentId">内容ID</param>
-    /// <param name="version">版本号</param>
+    /// <param name="version">版本Id</param>
     /// <returns></returns>
-    Task<ContentVersion?> GetVersionAsync(Guid contentId, int version);
+    Task<ContentVersion?> GetVersionAsync(Guid contentId, Guid version);
 
 
     /// <summary>

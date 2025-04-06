@@ -5,6 +5,7 @@
 using Biwen.QuickApi.Attributes;
 using Biwen.QuickApi.Contents.Abstractions;
 using Biwen.QuickApi.Contents.Domain;
+using Biwen.QuickApi.UnitOfWork;
 using Biwen.QuickApi.UnitOfWork.Pagenation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -100,7 +101,7 @@ public class CreateContentRequest : BaseRequest<CreateContentRequest>
     public string JsonContent { get; set; } = string.Empty;
 }
 
-[QuickApi("/infopages/create", Group = Constants.GroupName, Verbs = Verb.POST)]
+[QuickApi("/create", Group = Constants.GroupName, Verbs = Verb.POST)]
 [OpenApiMetadata("创建内容", "创建内容")]
 public class CreateContentApi(
     IContentRepository repository,
@@ -161,7 +162,7 @@ public class UpdateContentRequest : BaseRequest<UpdateContentRequest>
     public string JsonContent { get; set; } = string.Empty;
 }
 
-[QuickApi("/infopages/{id:guid}", Group = Constants.GroupName, Verbs = Verb.PUT)]
+[QuickApi("/{id:guid}", Group = Constants.GroupName, Verbs = Verb.PUT)]
 [OpenApiMetadata("更新内容", "更新内容")]
 public class UpdateContentApi(
     IContentRepository repository,
@@ -201,6 +202,13 @@ public class UpdateContentApi(
         // 更新内容
         await (Task)updateMethod?.Invoke(repository, [contentId, updatedContent])!;
 
+
+        //还需要更新标题和Slug
+        var content = await repository.GetRawContentAsync(contentId);
+        content.Title = request.Title;
+        content.Slug = request.Slug!;
+        await repository.UpdateRawContentAsync(content);
+
         // 更新状态
         var status = request.Status switch
         {
@@ -216,7 +224,7 @@ public class UpdateContentApi(
     }
 }
 
-[QuickApi("/infopages/{id:guid}", Group = Constants.GroupName, Verbs = Verb.DELETE)]
+[QuickApi("/{id:guid}", Group = Constants.GroupName, Verbs = Verb.DELETE)]
 [OpenApiMetadata("删除内容", "删除指定ID的内容")]
 public class DeleteContentApi(
     IContentRepository repository,

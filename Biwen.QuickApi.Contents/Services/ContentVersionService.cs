@@ -47,14 +47,13 @@ public class ContentVersionService : IContentVersionService
         await dbContext.Context.SaveChangesAsync();
     }
 
-    public async Task<ContentVersion?> GetVersionAsync(Guid contentId, int version)
+    public async Task<ContentVersion?> GetVersionAsync(Guid contentId, Guid version)
     {
         using var scope = _serviceScopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<IContentDbContext>();
 
-
         return await dbContext.ContentVersions
-            .FirstOrDefaultAsync(v => v.ContentId == contentId && v.Version == version);
+            .FirstOrDefaultAsync(v => v.Id == version && v.ContentId == contentId);
     }
 
     public async Task<IEnumerable<ContentVersion>> GetVersionsAsync(Guid contentId)
