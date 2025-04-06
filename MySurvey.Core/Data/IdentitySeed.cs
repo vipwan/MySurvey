@@ -2,6 +2,9 @@
 // The MySurvey.Core licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using Biwen.QuickApi.Contents;
+using Biwen.QuickApi.Contents.Abstractions;
+using Biwen.QuickApi.Contents.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MySurvey.Core.Entities;
@@ -60,7 +63,7 @@ public static class IdentitySeed
     /// </summary>
     /// <param name="serviceProvider"></param>
     /// <returns></returns>
-    public static async Task SeddDefaultSurveyAsync(IServiceProvider serviceProvider)
+    public static async Task SeedDefaultSurveyAsync(IServiceProvider serviceProvider)
     {
         using var scope = serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -225,5 +228,115 @@ public static class IdentitySeed
 
         survey.Questions = questions;
     }
+
+
+    /// <summary>
+    /// 创建默认内容
+    /// </summary>
+    /// <param name="serviceProvider"></param>
+    /// <summary>
+    /// 创建默认内容
+    /// </summary>
+    /// <param name="serviceProvider"></param>
+    /// <summary>
+    /// 创建默认内容
+    /// </summary>
+    /// <param name="serviceProvider"></param>
+    public static async Task SeedDefaultContentsAsync(IServiceProvider serviceProvider)
+    {
+        //创建默认的文档:
+        //关于我们,服务条款,隐私政策,帮助中心,常见问题,联系我们
+
+        using var scope = serviceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<ApplicationDbContext>>();
+        var serializer = scope.ServiceProvider.GetRequiredService<ContentSerializer>();
+
+        // 检查是否已存在内容
+        var existingContents = await dbContext.Contents
+            .Where(c => c.ContentType == typeof(Biwen.QuickApi.Contents.SamplePage).FullName)
+            .ToListAsync();
+
+        if (existingContents.Any())
+        {
+            logger.LogInformation("已存在内容页面，跳过初始化默认内容");
+            return;
+        }
+
+        logger.LogInformation("开始初始化默认内容页面");
+
+        // 使用固定的 Id 确保幂等性
+        var contentTypes = new[]
+        {
+        new { Id = new Guid("7F95A120-C65E-4FB1-9CA0-07C5A4331095"), Title = "关于我们", Slug = "about-us" },
+        new { Id = new Guid("C6D11D28-E8C2-4CD2-ADFC-5322A1C208C5"), Title = "服务条款", Slug = "terms-of-service" },
+        new { Id = new Guid("BF2ACBAA-DA93-4AED-92D8-767E2D3B8B72"), Title = "隐私政策", Slug = "privacy-policy" },
+        new { Id = new Guid("3D5C3AC9-6354-4B4E-A6ED-508812120C8F"), Title = "帮助中心", Slug = "help-center" },
+        new { Id = new Guid("E8F9E87B-DEF1-40F0-BB80-A919FAB95A2B"), Title = "常见问题", Slug = "faq" },
+        new { Id = new Guid("F67D329E-F54F-4E3B-BE0C-2E0E3652D9F3"), Title = "联系我们", Slug = "contact-us" }
+    };
+
+        var contents = new List<Content>();
+
+        foreach (var item in contentTypes)
+        {
+            // 创建 SamplePage 实例 - 注意我们使用 HTML 格式的内容
+            var samplePage = new SamplePage
+            {
+                // 标题是纯文本，保持不变
+                Title = new Biwen.QuickApi.Contents.FieldTypes.TextFieldType { Value = item.Title },
+
+                // Description 使用 HTML 格式
+                Description = new Biwen.QuickApi.Contents.FieldTypes.MarkdownFieldType
+                {
+                    Value = $"<p>这是{item.Title}的描述内容</p>"
+                },
+
+                // Content 使用更丰富的 HTML 格式
+                Content = new Biwen.QuickApi.Contents.FieldTypes.MarkdownFieldType
+                {
+                    Value = $@"<h1>{item.Title}</h1>
+<p>欢迎访问我们的{item.Title}页面。</p>
+<p>这是{item.Title}的详细内容，包含了关于我们系统的重要信息。</p>
+<h2>联系方式</h2>
+<p>如果您有任何问题或建议，请随时与我们联系。</p>
+<ul>
+  <li>电子邮件：vipwan@example.com</li>
+  <li>电话：+86 123-4567-8900</li>
+  <li>地址：深圳市南山区</li>
+</ul>"
+                },
+
+                // 标签数组
+                Tags = new Biwen.QuickApi.Contents.FieldTypes.ArrayFieldType
+                {
+                    Value = "官方,文档,帮助"
+                }
+            };
+
+            // 创建 Content 实体
+            var content = new Content
+            {
+                Id = item.Id, // 使用预定义的 Id
+                Title = item.Title,
+                Slug = item.Slug,
+                Status = ContentStatus.Published,
+                CreatedAt = DateTime.Now,
+                PublishedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now,
+                ContentType = typeof(SamplePage).FullName ?? "Biwen.QuickApi.Contents.SamplePage",
+                JsonContent = serializer.SerializeContent(samplePage)
+            };
+
+            contents.Add(content);
+        }
+
+        // 直接使用 ApplicationDbContext 添加到数据库
+        await dbContext.Contents.AddRangeAsync(contents);
+        await dbContext.SaveChangesAsync();
+
+        logger.LogInformation("默认内容页面初始化完成，共创建 {Count} 个页面", contents.Count);
+    }
+
 
 }

@@ -29,6 +29,7 @@ import {
     theme
 } from 'antd';
 import {
+    HistoryOutlined,
     PlusOutlined,
     EditOutlined,
     DeleteOutlined,
@@ -46,6 +47,27 @@ import Quill from 'quill'; // 导入 Quill 库
 import 'quill/dist/quill.snow.css'; // 导入 Quill 样式
 
 import TagsWidget from './widgets/TagsWidget';// 自定义标签组件
+
+import AuditLog from './AuditLog'; // 导入审计日志组件
+
+// 审计日志模态框组件
+const AuditLogModal = ({ contentId, api, visible, onClose }) => {
+    return (
+        <Modal
+            title="审计日志"
+            open={visible}
+            onCancel={onClose}
+            width={800}
+            footer={[
+                <Button key="close" onClick={onClose}>
+                    关闭
+                </Button>
+            ]}
+        >
+            <AuditLog contentId={contentId} api={api} />
+        </Modal>
+    );
+};
 
 const { Title, Text } = Typography;
 const { useToken } = theme;
@@ -190,7 +212,14 @@ export const contentApi = {
     updateInfoPage: (id, data) => api.put(`/api/contents/infopages/${id}`, data),
     deleteInfoPage: (id) => api.delete(`/api/contents/infopages/${id}`),
     getAllContentType: () => api.get('/api/contents/alltypes'),
-    getInfoPageSchema: (type) => api.get(`/api/contents/schema/${type}`)
+    getInfoPageSchema: (type) => api.get(`/api/contents/schema/${type}`),
+    // 审计日志 API
+    getAuditLogs: (id) => api.get(`/api/contents/infopages/${id}/auditlogs`),
+    getAuditLogsByDateRange: (params) => api.get('/api/contents/infopages/auditlogs', { params }),
+    // 版本控制 API
+    getVersions: (id) => api.get(`/api/contents/versions/${id}`),
+    getVersion: (id, versionId) => api.get(`/api/contents/versions/${id}/${versionId}`),
+    rollbackToVersion: (id, versionId) => api.post(`/api/contents/versions/${id}/rollback/${versionId}`)
 };
 
 // 格式化日期的工具函数
@@ -212,8 +241,19 @@ const formatDate = (dateString) => {
 };
 
 const InfoPage = () => {
+
     // 获取主题令牌，用于配色
     const { token } = useToken();
+
+    // 在 InfoPage 组件内部添加以下状态
+    const [auditLogVisible, setAuditLogVisible] = useState(false);
+    const [currentRecordId, setCurrentRecordId] = useState(null);
+
+    // 添加显示审计日志的方法
+    const showAuditLog = (record) => {
+        setCurrentRecordId(record.id);
+        setAuditLogVisible(true);
+    };
 
     // 表格引用
     const actionRef = useRef();
@@ -250,7 +290,7 @@ const InfoPage = () => {
         title: '',
         slug: '',
         status: 0,
-        contentType: 'InfoPage'
+        contentType: 'SamplePage'
     });
 
     // 获取Schema
@@ -761,6 +801,15 @@ const InfoPage = () => {
                         />
                     </Tooltip>
 
+                    {/* 审计日志按钮 */}
+                    <Tooltip title="审计日志">
+                        <Button
+                            type="text"
+                            icon={<HistoryOutlined />}
+                            onClick={() => showAuditLog(record)}
+                        />
+                    </Tooltip>
+
                     {/* 快速复制按钮 */}
                     <Tooltip title="快速复制">
                         <Button
@@ -986,7 +1035,7 @@ const InfoPage = () => {
                             ...restParams,
                         });
 
-                        console.log('API 返回的原始数据:', response.data);
+                        //console.log('API 返回的原始数据:', response.data);
 
                         // 处理数据中的日期格式，在控制台输出检查
                         if (response.data.items && response.data.items.length > 0) {
@@ -997,7 +1046,7 @@ const InfoPage = () => {
                             });
 
                             // 检查jsonContent
-                            console.log('第一条数据的jsonContent:', response.data.items[0].jsonContent);
+                            //console.log('第一条数据的jsonContent:', response.data.items[0].jsonContent);
                         }
 
                         return {
@@ -1047,7 +1096,6 @@ const InfoPage = () => {
                 ]}  // 只保留ContentType作为搜索条件
             />
 
-
             {/* 新增/编辑侧滑窗 */}
             <Drawer
                 title={
@@ -1079,9 +1127,11 @@ const InfoPage = () => {
                         </Button>
                     </Space>
                 }
-                bodyStyle={{
-                    padding: '16px',
-                    background: token.colorBgLayout
+                styles={{
+                    body: {
+                        padding: '16px',
+                        background: token.colorBgLayout
+                    }
                 }}
             >
                 {renderBasicForm()}
@@ -1094,6 +1144,15 @@ const InfoPage = () => {
                     </Text>
                 </div>
             </Drawer>
+
+            {/* 审计日志模态框 */}
+            <AuditLogModal
+                contentId={currentRecordId}
+                api={contentApi}
+                visible={auditLogVisible}
+                onClose={() => setAuditLogVisible(false)}
+            />
+
         </div>
     );
 };

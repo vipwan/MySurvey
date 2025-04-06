@@ -58,7 +58,10 @@ using (var scope = app.Services.CreateScope())
     await IdentitySeed.SeedDefaultUserAsync(scope.ServiceProvider);
 
     //初始化默认问卷
-    await IdentitySeed.SeddDefaultSurveyAsync(scope.ServiceProvider);
+    await IdentitySeed.SeedDefaultSurveyAsync(scope.ServiceProvider);
+
+    //初始化默认内容
+    await IdentitySeed.SeedDefaultContentsAsync(scope.ServiceProvider);
 
 }
 

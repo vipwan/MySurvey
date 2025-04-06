@@ -6,15 +6,18 @@
 
 using Biwen.QuickApi.Contents.Abstractions;
 using Biwen.QuickApi.Contents.Domain;
+using Biwen.QuickApi.Contents.Events;
+using Biwen.QuickApi.Events;
 using Biwen.QuickApi.UnitOfWork.Pagenation;
 using Microsoft.EntityFrameworkCore;
 
 namespace Biwen.QuickApi.Contents;
 
-public class ContentRepository<TDbContext>(
-    TDbContext dbContext, ContentSerializer serializer,
+public class ContentRepository(
+    ContentSerializer serializer,
+    IContentDbContext dbContext,
     IContentSchemaGenerator schemaGenerator) :
-    IContentRepository where TDbContext : DbContext, IContentDbContext
+    IContentRepository
 {
     public async Task<Guid> SaveContentAsync<T>(T content, string? title = null, string? slug = null) where T : IContent
     {
@@ -46,12 +49,12 @@ public class ContentRepository<TDbContext>(
             }
         }
 
-        // 如果是新内容，创建新的Content实体
+        // 创建新的Content实体
         var entity = new Content
         {
             Id = Guid.NewGuid(),
             Slug = slug ?? contentTitle!.ToLower().Replace(" ", "-"),
-            Title = contentTitle,
+            Title = contentTitle!,
             ContentType = contentType!,
             JsonContent = jsonContent,
             CreatedAt = DateTime.Now,
@@ -59,14 +62,17 @@ public class ContentRepository<TDbContext>(
         };
 
         dbContext.Contents.Add(entity);
-        await dbContext.SaveChangesAsync();
+        await dbContext.Context.SaveChangesAsync();
+
+        // 发布内容创建事件
+        await new ContentCreatedEvent(entity).PublishAsync();
 
         return entity.Id;
     }
 
     public async Task<T?> GetContentAsync<T>(Guid id) where T : IContent, new()
     {
-        var entity = await dbContext.Set<Content>().FindAsync(id);
+        var entity = await dbContext.Context.Set<Content>().FindAsync(id);
         if (entity == null)
             return default;
 
@@ -98,10 +104,8 @@ public class ContentRepository<TDbContext>(
         string? slug = null,
         int pageIndex = 0,
         int len = 10,
-
         int? status = null,
         string? title = null
-
         ) where T : IContent, new()
     {
         var contentType = typeof(T).FullName;
@@ -110,9 +114,9 @@ public class ContentRepository<TDbContext>(
             .Where(c => status == null ? true : c.Status == (ContentStatus)status)
             .Where(c => title == null ? true : c.Title.Contains(title))
             .OrderByDescending(c => c.CreatedAt);
+
         return await queryable.ToPagedListAsync(pageIndex, len);
     }
-
 
     public async Task<T?> GetContentsByTypeAsync<T>(string slug) where T : IContent, new()
     {
@@ -126,27 +130,36 @@ public class ContentRepository<TDbContext>(
         return serializer.DeserializeContent<T>(item.JsonContent);
     }
 
-
     public async Task UpdateContentAsync<T>(Guid id, T content) where T : IContent
     {
         var entity = await dbContext.Contents.FindAsync(id);
         if (entity == null)
             throw new KeyNotFoundException($"Content with ID {id} not found");
 
+        // 保存旧版本的内容以用于事件发布
+        var previousVersion = entity.JsonContent;
+
+        // 更新内容
         entity.JsonContent = serializer.SerializeContent(content);
         entity.UpdatedAt = DateTime.Now;
 
-        await dbContext.SaveChangesAsync();
+        await dbContext.Context.SaveChangesAsync();
+
+        // 发布内容更新事件
+        await new ContentUpdatedEvent(entity, previousVersion).PublishAsync();
     }
 
     public async Task DeleteContentAsync(Guid id)
     {
-        var entity = await dbContext.Set<Content>().FindAsync(id);
+        var entity = await dbContext.Context.Set<Content>().FindAsync(id);
         if (entity == null)
             return;
 
-        dbContext.Set<Content>().Remove(entity);
-        await dbContext.SaveChangesAsync();
+        dbContext.Context.Set<Content>().Remove(entity);
+        await dbContext.Context.SaveChangesAsync();
+
+        // 发布内容删除事件
+        await new ContentDeletedEvent(id).PublishAsync();
     }
 
     /// <summary>
@@ -158,19 +171,63 @@ public class ContentRepository<TDbContext>(
     /// <exception cref="KeyNotFoundException"></exception>
     public async Task SetContentStatusAsync(Guid id, ContentStatus status)
     {
-        var entity = await dbContext.Set<Content>().FindAsync(id);
+        var entity = await dbContext.Context.Set<Content>().FindAsync(id);
         if (entity == null)
             throw new KeyNotFoundException($"Content with ID {id} not found");
+
+        // 记录旧状态
+        var previousStatus = entity.Status;
+
+        // 更新状态
         entity.Status = status;
         entity.UpdatedAt = DateTime.Now;
 
         if (status == ContentStatus.Published)
             entity.PublishedAt = DateTime.Now;
 
-        await dbContext.SaveChangesAsync();
+        await dbContext.Context.SaveChangesAsync();
+
+        // 发布状态变更事件
+        if (previousStatus != status)
+        {
+            await new ContentStatusChangedEvent(entity, previousStatus, status).PublishAsync();
+        }
     }
 
-
+    /// <summary>
+    /// 获取原始内容实体
+    /// </summary>
+    /// <param name="id">内容ID</param>
+    /// <returns>内容实体</returns>
+    public async Task<Content> GetRawContentAsync(Guid id)
+    {
+        var entity = await dbContext.Contents.FindAsync(id);
+        if (entity == null)
+            throw new KeyNotFoundException($"未找到ID为 {id} 的内容");
+        
+        return entity;
+    }
+    
+    /// <summary>
+    /// 更新原始内容实体
+    /// </summary>
+    /// <param name="content">内容实体</param>
+    public async Task UpdateRawContentAsync(Content content)
+    {
+        // 保存旧版本的内容以用于事件发布
+        var previousVersion = content.JsonContent;
+        
+        // 只更新必要的字段
+        content.UpdatedAt = DateTime.Now;
+        
+        // 标记实体为已修改
+        dbContext.Context.Entry(content).State = EntityState.Modified;
+        await dbContext.Context.SaveChangesAsync();
+        
+        // 发布内容更新事件
+        await new ContentUpdatedEvent(content, previousVersion).PublishAsync();
+    }
+    
     // 获取内容的Schema
     public string GetContentSchema<T>() where T : IContent
     {

@@ -12,13 +12,23 @@ using MySurvey.Core.Entities;
 namespace MySurvey.Core.Data;
 
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) :
-    IdentityDbContext(options), 
+    IdentityDbContext(options),
     IBiwenSettingsDbContext,
     IContentDbContext
 {
     public DbSet<Setting> Settings { get; set; } = null!;
 
+    /// <summary>
+    /// CurrentDbContext
+    /// </summary>
+    public DbContext Context => this;
+
+    // CMS
     public DbSet<Content> Contents { get; set; } = null!;
+
+    public DbSet<ContentAuditLog> ContentAuditLogs { get; set; } = null!;
+
+    public DbSet<ContentVersion> ContentVersions { get; set; } = null!;
 
 
     // 问卷调查相关
@@ -38,6 +48,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         //重命名表名
         modelBuilder.Entity<Setting>().ToTable("SystemSettings");
         modelBuilder.Entity<Content>().ToTable("SystemContents");
+        modelBuilder.Entity<ContentAuditLog>().ToTable("SystemContentAuditLogs");
+        modelBuilder.Entity<ContentVersion>().ToTable("SystemContentVersions");
 
         // 配置 Survey
         modelBuilder.Entity<Survey>(entity =>

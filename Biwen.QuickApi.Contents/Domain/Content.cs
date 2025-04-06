@@ -4,6 +4,7 @@
 // Biwen.QuickApi Author: 万雅虎 Github: https://github.com/vipwan
 // Modify Date: 2025-04-04 15:03:50 ContentTypeField.cs
 
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 
 namespace Biwen.QuickApi.Contents.Domain;
@@ -11,6 +12,10 @@ namespace Biwen.QuickApi.Contents.Domain;
 /// <summary>
 /// 持久层实体
 /// </summary>
+[Index(
+    nameof(Content.Slug),
+    nameof(Content.Status),
+    nameof(Content.ContentType))]
 public class Content
 {
     [Key]

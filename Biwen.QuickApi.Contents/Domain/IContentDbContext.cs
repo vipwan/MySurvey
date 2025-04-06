@@ -5,13 +5,19 @@
 // Modify Date: 2025-04-04 21:57:09 IDbContext.cs
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Biwen.QuickApi.Contents.Domain;
 
 /// <summary>
 /// IDbContext
 /// </summary>
-public interface IContentDbContext
+public interface IContentDbContext : ICurrentDbContext
 {
     DbSet<Content> Contents { get; set; }
+
+    DbSet<ContentAuditLog> ContentAuditLogs { get; set; }
+
+    DbSet<ContentVersion> ContentVersions { get; set; }
+
 }

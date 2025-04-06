@@ -8,9 +8,9 @@ using Biwen.QuickApi.Contents.Abstractions;
 using Biwen.QuickApi.Contents.Domain;
 using Biwen.QuickApi.Contents.FieldTypes;
 using Biwen.QuickApi.Contents.Schema;
+using Biwen.QuickApi.Contents.Services;
 using Biwen.QuickApi.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Biwen.QuickApi.Contents;
 
@@ -66,10 +66,14 @@ public static class ServiceRegistration
         services.AddSingleton<ContentSerializer>();
 
         // 注册内容仓储上下文
-        services.AddScoped<ContentRepository<TDbContext>>();
+        services.AddScoped<IContentDbContext, TDbContext>();
         // 注册内容仓储
-        services.AddScoped<IContentRepository, ContentRepository<TDbContext>>();
+        services.AddScoped<IContentRepository, ContentRepository>();
 
+        // 注册内容审计日志服务
+        services.AddScoped<IContentAuditLogService, ContentAuditLogService>();
+        // 注册内容版本服务
+        services.AddScoped<IContentVersionService, ContentVersionService>();
 
         // 注册GroupRouteBuilder
         services.AddQuickApiGroupRouteBuilder<ContentsGroupRouteBuilder>();

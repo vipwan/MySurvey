@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Tag, Input, Tooltip, theme } from 'antd';
+import { Tag, Input, Tooltip, theme, message } from 'antd';
 const { useToken } = theme;
 import { PlusOutlined } from '@ant-design/icons';
 
@@ -15,6 +15,14 @@ const TagsWidget = React.memo(({ onChange, value, schema }) => {
     // 引用
     const inputRef = useRef(null);
     const editInputRef = useRef(null);
+
+    // 验证输入是否为合法文本（只允许字母、数字、中文和部分常用标点）
+    const isValidInput = (value) => {
+        // 正则表达式匹配合法字符
+        // 允许字母、数字、中文、空格和一些常用标点（如逗号、句号、短横线等）
+        const validRegex = /^[\u4e00-\u9fa5a-zA-Z0-9\s.,，。、_\-]*$/;
+        return validRegex.test(value);
+    };
 
     // 初始化标签数据
     useEffect(() => {
@@ -71,10 +79,24 @@ const TagsWidget = React.memo(({ onChange, value, schema }) => {
         setInputVisible(true);
     };
 
+    // 处理输入框变化
+    const handleInputChange = (e) => {
+        const value = e.target.value;
+        if (value && !isValidInput(value)) {
+            message.warning('只能输入字母、数字、中文和常用标点');
+            return;
+        }
+        setInputValue(value);
+    };
+
     // 处理输入框确认
     const handleInputConfirm = () => {
         if (inputValue && !tags.includes(inputValue)) {
-            handleTagsChange([...tags, inputValue]);
+            if (isValidInput(inputValue)) {
+                handleTagsChange([...tags, inputValue]);
+            } else {
+                message.error('标签包含不允许的字符');
+            }
         }
         setInputVisible(false);
         setInputValue('');
@@ -82,16 +104,24 @@ const TagsWidget = React.memo(({ onChange, value, schema }) => {
 
     // 处理开始编辑标签
     const handleEditInputChange = (e) => {
-        setEditInputValue(e.target.value);
+        const value = e.target.value;
+        if (value && !isValidInput(value)) {
+            message.warning('只能输入字母、数字、中文和常用标点');
+            return;
+        }
+        setEditInputValue(value);
     };
 
     // 处理编辑框确认
     const handleEditInputConfirm = () => {
         const newTags = [...tags];
-        // 检查标签是否重复，如果重复则不添加
-        if (editInputValue && !tags.some((tag, i) => i !== editInputIndex && tag === editInputValue)) {
+        // 检查标签是否合法及重复
+        if (editInputValue && isValidInput(editInputValue) &&
+            !tags.some((tag, i) => i !== editInputIndex && tag === editInputValue)) {
             newTags[editInputIndex] = editInputValue;
             handleTagsChange(newTags);
+        } else if (!isValidInput(editInputValue)) {
+            message.error('标签包含不允许的字符');
         }
         setEditInputIndex(-1);
         setEditInputValue('');
@@ -115,8 +145,8 @@ const TagsWidget = React.memo(({ onChange, value, schema }) => {
     };
 
     // 读取schema中的属性配置
-    const maxLength = schema?.props?.maxLength || 50; // 标签最大长度
-    const maxCount = schema?.props?.maxCount || 20;   // 标签最大数量
+    const maxLength = schema?.props?.maxLength || 20; // 标签最大长度
+    const maxCount = schema?.props?.maxCount || 10;   // 标签最大数量
     const placeholder = schema?.props?.placeholder || '按回车键添加';
 
     // 是否禁用新增标签的按钮（达到最大数量时）
@@ -179,7 +209,7 @@ const TagsWidget = React.memo(({ onChange, value, schema }) => {
                     style={tagInputStyle}
                     value={inputValue}
                     maxLength={maxLength}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    onChange={handleInputChange}
                     onBlur={handleInputConfirm}
                     onPressEnter={handleInputConfirm}
                     placeholder={placeholder}
@@ -208,7 +238,7 @@ const TagsWidget = React.memo(({ onChange, value, schema }) => {
                 {schema?.description ? (
                     <div>{schema.description}</div>
                 ) : (
-                    <div>提示：双击标签可编辑，按回车确认</div>
+                    <div>提示：双击标签可编辑，按回车确认；仅允许输入字母、数字、中文和常用标点</div>
                 )}
                 <div>当前：{tags.length}/{maxCount}</div>
             </div>
