@@ -14,7 +14,7 @@ namespace Biwen.QuickApi.Contents;
 /// </summary>
 public class ContentFieldManager
 {
-    private readonly Dictionary<string, IFieldType> _fieldTypes = new();
+    private readonly Dictionary<string, IFieldType> _fieldTypes = [];
 
     public ContentFieldManager(IEnumerable<IFieldType> fieldTypes)
     {

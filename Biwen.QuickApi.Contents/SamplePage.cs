@@ -6,11 +6,6 @@
 
 using Biwen.QuickApi.Contents.Abstractions;
 using Biwen.QuickApi.Contents.FieldTypes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Biwen.QuickApi.Contents;
 
@@ -41,11 +36,12 @@ public class SamplePage : ContentBase<SamplePage>
 
 
     [Display(Name = "Tags")]
-    [Description("Tags")]
+    [Description("标签")]
+    [ArrayField(10, 5)]
     public ArrayFieldType Tags { get; set; } = null!;
 
 
-    public override string Content_Description => "这是一个普通的文档类型";
+    public override string Content_Description => "默认文档类型";
 
     /// <summary>
     /// 默认Page排序为最前

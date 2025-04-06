@@ -80,3 +80,21 @@ public class ArrayFieldType : IFieldType
     /// <returns>验证错误消息</returns>
     public string? GetValidationErrorMessage() => null;
 }
+
+
+/// <summary>
+/// 标记数组字段的属性
+/// </summary>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = false, AllowMultiple = false)]
+public class ArrayFieldAttribute(int maxLength = 20, int maxCount = 10) : Attribute
+{
+    /// <summary>
+    /// 默认单个元素最大长度
+    /// </summary>
+    public int MaxLength { get; set; } = maxLength;
+
+    /// <summary>
+    /// 默认最大数量
+    /// </summary>
+    public int MaxCount { get; set; } = maxCount;
+}

@@ -4,6 +4,7 @@
 // Biwen.QuickApi Author: 万雅虎 Github: https://github.com/vipwan
 // Modify Date: 2025-04-05 22:52:58 ContentsGroupRouteBuilder.cs
 
+using Biwen.QuickApi.Contents.Apis;
 using Biwen.QuickApi.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;

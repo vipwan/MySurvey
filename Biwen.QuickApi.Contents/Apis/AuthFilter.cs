@@ -7,7 +7,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
-namespace Biwen.QuickApi.Contents;
+namespace Biwen.QuickApi.Contents.Apis;
 
 /// <summary>
 /// 鉴权筛选器

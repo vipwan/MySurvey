@@ -475,6 +475,21 @@ public class XRenderSchemaGenerator(IMemoryCache memoryCache) : IContentSchemaGe
             }
         }
 
+
+
+        // 处理数组长度和数量
+        // 存放于props中
+        var arrayAttribute = property.GetCustomAttribute<ArrayFieldAttribute>();
+        if (arrayAttribute != null)
+        {
+            var props = new JsonObject
+            {
+                ["maxCount"] = arrayAttribute.MaxCount,
+                ["maxLength"] = arrayAttribute.MaxLength
+            };
+            schema["props"] = props.DeepClone();
+        }
+
         // 处理默认值
         if (property.PropertyType.IsGenericType)
         {

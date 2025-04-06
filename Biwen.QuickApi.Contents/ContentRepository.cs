@@ -11,27 +11,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Biwen.QuickApi.Contents;
 
-public class ContentRepository<TDbContext> : IContentRepository where TDbContext : DbContext, IContentDbContext
+public class ContentRepository<TDbContext>(
+    TDbContext dbContext, ContentSerializer serializer,
+    IContentSchemaGenerator schemaGenerator) :
+    IContentRepository where TDbContext : DbContext, IContentDbContext
 {
-    private readonly TDbContext _dbContext;
-    private readonly ContentSerializer _serializer;
-    private readonly IContentSchemaGenerator _schemaGenerator;
-
-    public ContentRepository(TDbContext dbContext, ContentSerializer serializer,
-        IContentSchemaGenerator schemaGenerator)
-    {
-        _dbContext = dbContext;
-        _serializer = serializer;
-        _schemaGenerator = schemaGenerator;
-    }
-
     public async Task<Guid> SaveContentAsync<T>(T content, string? title = null, string? slug = null) where T : IContent
     {
         // 获取内容类型的完全限定名
         var contentType = content.GetType().FullName;
 
         // 序列化内容字段值
-        var jsonContent = _serializer.SerializeContent(content);
+        var jsonContent = serializer.SerializeContent(content);
 
         // 确定标题（从传入参数或从内容中获取）
         var contentTitle = title;
@@ -67,30 +58,30 @@ public class ContentRepository<TDbContext> : IContentRepository where TDbContext
             Status = ContentStatus.Draft
         };
 
-        _dbContext.Contents.Add(entity);
-        await _dbContext.SaveChangesAsync();
+        dbContext.Contents.Add(entity);
+        await dbContext.SaveChangesAsync();
 
         return entity.Id;
     }
 
     public async Task<T?> GetContentAsync<T>(Guid id) where T : IContent, new()
     {
-        var entity = await _dbContext.Set<Content>().FindAsync(id);
+        var entity = await dbContext.Set<Content>().FindAsync(id);
         if (entity == null)
             return default;
 
-        return _serializer.DeserializeContent<T>(entity.JsonContent);
+        return serializer.DeserializeContent<T>(entity.JsonContent);
     }
 
     public async Task<IPagedList<T>> GetContentsByTypeAsync<T>(int pageIndex = 0, int len = 10) where T : IContent, new()
     {
         var contentType = typeof(T).FullName;
 
-        var queryable = _dbContext.Contents
+        var queryable = dbContext.Contents
             .Where(c => c.ContentType == contentType)
             .OrderByDescending(c => c.CreatedAt);
 
-        return await queryable.Select(e => _serializer.DeserializeContent<T>(e.JsonContent))
+        return await queryable.Select(e => serializer.DeserializeContent<T>(e.JsonContent))
             .Where(c => c != null)
             .ToPagedListAsync(pageIndex, len);
     }
@@ -114,7 +105,7 @@ public class ContentRepository<TDbContext> : IContentRepository where TDbContext
         ) where T : IContent, new()
     {
         var contentType = typeof(T).FullName;
-        var queryable = _dbContext.Contents
+        var queryable = dbContext.Contents
             .Where(c => c.ContentType == contentType && (slug == null ? true : c.Slug == slug))
             .Where(c => status == null ? true : c.Status == (ContentStatus)status)
             .Where(c => title == null ? true : c.Title.Contains(title))
@@ -126,36 +117,36 @@ public class ContentRepository<TDbContext> : IContentRepository where TDbContext
     public async Task<T?> GetContentsByTypeAsync<T>(string slug) where T : IContent, new()
     {
         var contentType = typeof(T).FullName;
-        var item = await _dbContext.Contents
+        var item = await dbContext.Contents
             .Where(c => c.ContentType == contentType && c.Slug == slug)
             .FirstOrDefaultAsync();
         if (item == null)
             return default;
 
-        return _serializer.DeserializeContent<T>(item.JsonContent);
+        return serializer.DeserializeContent<T>(item.JsonContent);
     }
 
 
     public async Task UpdateContentAsync<T>(Guid id, T content) where T : IContent
     {
-        var entity = await _dbContext.Contents.FindAsync(id);
+        var entity = await dbContext.Contents.FindAsync(id);
         if (entity == null)
             throw new KeyNotFoundException($"Content with ID {id} not found");
 
-        entity.JsonContent = _serializer.SerializeContent(content);
+        entity.JsonContent = serializer.SerializeContent(content);
         entity.UpdatedAt = DateTime.Now;
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
     }
 
     public async Task DeleteContentAsync(Guid id)
     {
-        var entity = await _dbContext.Set<Content>().FindAsync(id);
+        var entity = await dbContext.Set<Content>().FindAsync(id);
         if (entity == null)
             return;
 
-        _dbContext.Set<Content>().Remove(entity);
-        await _dbContext.SaveChangesAsync();
+        dbContext.Set<Content>().Remove(entity);
+        await dbContext.SaveChangesAsync();
     }
 
     /// <summary>
@@ -167,7 +158,7 @@ public class ContentRepository<TDbContext> : IContentRepository where TDbContext
     /// <exception cref="KeyNotFoundException"></exception>
     public async Task SetContentStatusAsync(Guid id, ContentStatus status)
     {
-        var entity = await _dbContext.Set<Content>().FindAsync(id);
+        var entity = await dbContext.Set<Content>().FindAsync(id);
         if (entity == null)
             throw new KeyNotFoundException($"Content with ID {id} not found");
         entity.Status = status;
@@ -176,13 +167,13 @@ public class ContentRepository<TDbContext> : IContentRepository where TDbContext
         if (status == ContentStatus.Published)
             entity.PublishedAt = DateTime.Now;
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
     }
 
 
     // 获取内容的Schema
     public string GetContentSchema<T>() where T : IContent
     {
-        return _schemaGenerator.GenerateSchemaJson<T>();
+        return schemaGenerator.GenerateSchemaJson<T>();
     }
 }
