@@ -32,6 +32,10 @@ public class BooleanFieldType : IFieldType
         {
             return boolValue.ToString();
         }
+        else if (value is string stringValue)
+        {
+            return stringValue;//true,false;
+        }
         return string.Empty;
     }
 
@@ -43,11 +47,11 @@ public class BooleanFieldType : IFieldType
     private object? _value;
 
     /// <summary>
-    /// 值属性
+    /// 值属性.注意返回bool值的小写形式
     /// </summary>
     public string Value
     {
-        get => _value?.ToString() ?? string.Empty;
+        get => _value?.ToString()?.ToLower() ?? string.Empty;
         set => _value = value;
     }
 

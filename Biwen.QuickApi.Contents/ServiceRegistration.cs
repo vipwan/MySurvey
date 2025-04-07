@@ -24,7 +24,7 @@ public static class ServiceRegistration
     /// <param name="options">配置</param>
     /// <returns></returns>
     public static IServiceCollection AddBiwenContents<TDbContext>(this IServiceCollection services,
-        Action<BiwenContentOptions> options)
+        Action<BiwenContentOptions>? options = null)
         where TDbContext : DbContext, IContentDbContext
     {
         // Options

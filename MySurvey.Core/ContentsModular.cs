@@ -21,7 +21,12 @@ public class ContentsModular : ModularBase
             o.PermissionValidator = async (ctx) =>
             {
                 await Task.CompletedTask;
+
+#if DEBUG
+                return true;
+#else
                 return ctx.User.Identity?.IsAuthenticated is true;
+#endif
             };
         });
 

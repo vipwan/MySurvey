@@ -18,7 +18,7 @@ public class ArrayFieldType : IFieldType
     public Type ValueType => typeof(string[]);
 
 
-    const string SplitString = "(^!@#$|)";
+    const string SplitString = ",";
 
     public object? ConvertValue(string value)
     {

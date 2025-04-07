@@ -122,13 +122,6 @@ public class ContentSerializer
             // 设置字段值
             SetFieldValue(fieldTypeInstance, fieldValue.Value);
 
-
-            //property.PropertyType.Name
-            //"OptionsMultiFieldType`1"
-            //typeof(OptionsMultiFieldType<>).Name
-            //"OptionsMultiFieldType`1"
-
-
             // 泛型则表示枚举,单选:
             if (property.PropertyType.IsGenericType && property.PropertyType.Name == (typeof(OptionsFieldType<>).Name))
             {
@@ -163,16 +156,17 @@ public class ContentSerializer
                 // 设置属性值
                 property.SetValue(content, optionsValue);
             }
+            else if (fieldTypeInstance is ArrayFieldType arrayFieldType)
+            {
+                // 修复：正确设置数组字段值，传入字段值而非实例本身
+                arrayFieldType.SetValue(fieldValue.Value);
+                // 设置属性值
+                property.SetValue(content, arrayFieldType);
+            }
             else if (fieldTypeInstance is IFieldType field)
             {
                 // 设置属性值
                 property.SetValue(content, field);
-            }
-
-            else if (fieldTypeInstance is ArrayFieldType arrayFieldType)
-            {
-                // 设置数组字段值
-                arrayFieldType.SetValue(fieldTypeInstance);
             }
             else
             {
