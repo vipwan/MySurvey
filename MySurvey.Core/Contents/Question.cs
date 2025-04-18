@@ -55,6 +55,7 @@ public class Question : ContentBase<Question>
     //public NumberFieldType? Number { get; set; } = null!;
 
     [DisplayName("整数")]
+    [Range(1, 10)]
     public IntegerFieldType? Integer { get; set; }
 
     [Required]
