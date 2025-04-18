@@ -10,7 +10,7 @@ namespace MySurvey.Core.Entities;
 /// </summary>
 public class Survey
 {
-    public Guid Id {get;set;}
+    public Guid Id { get; set; }
 
     /// <summary>
     /// 问卷标题
@@ -68,25 +68,30 @@ public class Survey
 /// <summary>
 /// 问卷状态
 /// </summary>
+[AutoDescription]
 public enum SurveyStatus
 {
     /// <summary>
     /// 草稿
     /// </summary>
+    [Description("草稿")]
     Draft = 0,
 
     /// <summary>
     /// 已发布
     /// </summary>
+    [Description("已发布")]
     Published = 1,
 
     /// <summary>
     /// 已结束
     /// </summary>
+    [Description("已结束")]
     Ended = 2,
 
     /// <summary>
     /// 已删除
     /// </summary>
+    [Description("已删除")]
     Deleted = 3
-} 
+}

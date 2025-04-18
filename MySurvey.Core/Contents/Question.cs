@@ -69,6 +69,7 @@ public class Question : ContentBase<Question>
 
 }
 
+[AutoDescription]
 [Description("问题分类")]
 public enum QuestionType
 {

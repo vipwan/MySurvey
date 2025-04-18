@@ -42,6 +42,7 @@ public class Content
     public string JsonContent { get; set; } = string.Empty; // 存储序列化后的内容字段值
 }
 
+[AutoDescription]
 public enum ContentStatus
 {
     [Description("草稿")]

@@ -13,7 +13,7 @@ namespace MySurvey.Core.Entities;
 /// </summary>
 public class SurveyQuestion
 {
-    public Guid Id {get;set;}
+    public Guid Id { get; set; }
 
 
     /// <summary>
@@ -118,6 +118,7 @@ public enum ValidationRuleType
 /// <summary>
 /// 问题类型
 /// </summary>
+[AutoDescription]
 public enum QuestionType
 {
     /// <summary>
@@ -155,4 +156,4 @@ public enum QuestionType
     /// </summary>
     [Description("矩阵多选题")]
     MatrixMultipleChoice = 5
-} 
+}

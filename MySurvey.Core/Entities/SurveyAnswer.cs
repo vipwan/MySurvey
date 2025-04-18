@@ -7,7 +7,7 @@ namespace MySurvey.Core.Entities;
 /// </summary>
 public class SurveyAnswer
 {
-    public Guid Id {get;set;}
+    public Guid Id { get; set; }
 
     /// <summary>
     /// 问卷Id
@@ -58,20 +58,24 @@ public class SurveyAnswer
 /// <summary>
 /// 答卷状态
 /// </summary>
+[AutoDescription]
 public enum AnswerStatus
 {
     /// <summary>
     /// 进行中
     /// </summary>
+    [Description("进行中")]
     InProgress = 0,
 
     /// <summary>
     /// 已完成
     /// </summary>
+    [Description("已完成")]
     Completed = 1,
 
     /// <summary>
     /// 已提交
     /// </summary>
+    [Description("已提交")]
     Submitted = 2
-} 
+}
